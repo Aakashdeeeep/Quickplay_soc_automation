@@ -11,6 +11,7 @@ SCHEMA = """
 CREATE TABLE IF NOT EXISTS devices (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     slot_id TEXT UNIQUE NOT NULL,
+    mac_address TEXT,
     device_type TEXT NOT NULL,
     last_known_ip TEXT,
     network TEXT,
@@ -18,6 +19,20 @@ CREATE TABLE IF NOT EXISTS devices (
     friendly_name TEXT,
     platform TEXT,
     roku_app_id TEXT
+);
+
+CREATE TABLE IF NOT EXISTS content_catalog (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    slot_id TEXT UNIQUE NOT NULL,
+    tv_id TEXT NOT NULL,
+    channel TEXT NOT NULL,
+    device_type TEXT,
+    platform TEXT NOT NULL,
+    content_title TEXT NOT NULL,
+    content_type TEXT NOT NULL,
+    content_id TEXT,
+    verified INTEGER DEFAULT 0,
+    notes TEXT
 );
 """
 
@@ -37,6 +52,14 @@ def _migrate(conn):
     existing_columns = {row["name"] for row in conn.execute("PRAGMA table_info(devices)")}
     if "roku_app_id" not in existing_columns:
         conn.execute("ALTER TABLE devices ADD COLUMN roku_app_id TEXT")
+    if "mac_address" not in existing_columns:
+        conn.execute("ALTER TABLE devices ADD COLUMN mac_address TEXT")
+
+    # Permanent hardware identity — unique when set, but many rows will
+    # have no MAC yet (pending real fleet data), so this must tolerate
+    # multiple NULLs. SQLite unique indexes already treat NULL as distinct
+    # from other NULLs, so this doesn't need to be a partial index.
+    conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_devices_mac_address ON devices(mac_address)")
 
 
 def init_db():

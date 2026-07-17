@@ -15,14 +15,29 @@
 
 <div class="device-grid" data-network="{{ network_name }}">
     {% for device in devices %}
+    {% set entry = catalog_by_slot.get(device.slot_id) %}
+    {% set restricted = entry and is_ops_restricted_platform(entry.platform) and network_name != "OPS" %}
     <div class="device-tile"
          data-slot-id="{{ device.slot_id }}"
          data-device-type="{{ device.device_type }}"
-         data-platform="{{ device.platform or '' }}">
+         data-platform="{{ device.platform or '' }}"
+         data-assigned-platform="{{ entry.platform if entry else '' }}"
+         data-assigned-title="{{ entry.content_title if entry else '' }}"
+         data-assigned-type="{{ entry.content_type if entry else '' }}"
+         data-assigned-content-id="{{ (entry.content_id or '') if entry else '' }}"
+         data-assigned-restricted="{{ 'true' if restricted else 'false' }}">
         <div class="device-tile-icon">{{ device_icons.get(device.device_type, '❓') }}</div>
         <div class="device-tile-slot">{{ device.friendly_name or device.slot_id }}</div>
         <div class="device-tile-type">{{ device.device_type }}</div>
         <div class="device-tile-ip">{{ device.last_known_ip or 'no IP' }}</div>
+        {% if entry %}
+        <div class="device-tile-assigned">
+            {{ entry.content_title }}
+            <span class="tag {{ 'tag-live' if entry.content_type == 'Live' else 'tag-vod' }}">{{ entry.content_type }}</span>
+            {% if restricted %}<span class="tag tag-ops">OPS ONLY</span>{% endif %}
+            {% if not entry.verified %}<span class="tag tag-unverified">unverified</span>{% endif %}
+        </div>
+        {% endif %}
         <div class="device-tile-status status-unknown" data-status-badge>checking…</div>
     </div>
     {% endfor %}
@@ -32,6 +47,11 @@
     <div class="modal-box">
         <button class="modal-close" id="modal-close">&times;</button>
         <h2 id="modal-slot-title">Launch content</h2>
+
+        <div id="assigned-box" class="assigned-box hidden">
+            <div id="assigned-text"></div>
+            <button id="use-assigned-btn" type="button">Use assigned title</button>
+        </div>
 
         <label for="platform-select">Platform</label>
         <select id="platform-select">

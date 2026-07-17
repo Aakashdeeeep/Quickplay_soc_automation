@@ -1,0 +1,17 @@
+slot_id,mac_address,device_type
+TV1-CH1,38:86:F7:A5:C5:36,chromecast-gtv
+TV1-CH2,10:B3:EC:2B:9C:1C,appletv
+TV1-CH3,20:A1:71:5A:12:81,firetv
+TV1-CH4,10:2D:41:70:D8:33,mi-stick
+TV1-CH5,74:E2:0C:68:44:23,firetv
+TV1-CH6,A8:51:AB:AA:83:77,appletv
+TV1-CH7,6C:55:B1:81:07:BD,firetv
+TV1-CH8,D4:E2:2F:52:72:AB,roku
+TV1-CH9,A8:51:AB:AD:9F:71,appletv
+TV1-CH10,D4:E2:2F:52:8E:B4,roku
+TV1-CH11,84:EA:ED:EA:1A:A6,roku
+TV1-CH12,DC:E5:5B:54:F7:C9,chromecast-gtv
+TV1-CH13,90:A8:22:F5:28:81,firetv
+TV1-CH14,38:86:F7:A1:47:94,chromecast-gtv
+TV1-CH15,A8:51:AB:1C:F9:FB,appletv
+TV1-CH16,80:6D:71:37:96:12,firetv

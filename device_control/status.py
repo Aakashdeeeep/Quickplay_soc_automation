@@ -8,7 +8,7 @@ a launch-equivalent request.
 
 import socket
 
-from config import ROKU_ECP_PORT, ADB_PORT, STATUS_CHECK_TIMEOUT
+from config import ROKU_ECP_PORT, ADB_PORT, STATUS_CHECK_TIMEOUT, ADB_DEVICE_TYPES
 from device_control import adb as adb_control
 
 
@@ -34,7 +34,7 @@ def check_status(device_type, ip):
         online = _port_open(ip, ROKU_ECP_PORT)
         return {"online": online, "detail": "reachable" if online else "unreachable"}
 
-    if device_type in ("firetv", "androidtv", "chromecast-gtv"):
+    if device_type in ADB_DEVICE_TYPES:
         if not _port_open(ip, ADB_PORT):
             return {"online": False, "detail": "unreachable"}
         state = adb_control.get_device_state(ip)

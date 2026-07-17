@@ -99,6 +99,54 @@ h1 { margin-top: 0; }
 .device-tile-type { color: var(--text-dim); font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.04em; }
 .device-tile-ip { color: var(--text-dim); font-size: 0.8rem; margin-top: 4px; }
 
+.device-tile-assigned {
+    margin-top: 8px;
+    font-size: 0.75rem;
+    color: var(--text-dim);
+    line-height: 1.6;
+}
+
+.tag {
+    display: inline-block;
+    font-size: 0.65rem;
+    padding: 1px 6px;
+    border-radius: 3px;
+    margin-left: 4px;
+    vertical-align: middle;
+}
+.tag-live { background: rgba(52, 199, 123, 0.15); color: var(--green); }
+.tag-vod { background: rgba(79, 140, 255, 0.15); color: var(--accent); }
+.tag-ops { background: rgba(229, 72, 77, 0.15); color: var(--red); }
+.tag-unverified { background: rgba(229, 166, 61, 0.15); color: var(--amber); }
+
+.assigned-box {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 12px;
+    margin-top: 14px;
+    font-size: 0.85rem;
+}
+.assigned-box.hidden { display: none; }
+.assigned-box button {
+    margin-top: 8px;
+    width: 100%;
+    padding: 6px;
+    background: transparent;
+    border: 1px solid var(--accent);
+    color: var(--accent);
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.85rem;
+}
+.assigned-box button:hover { background: rgba(79, 140, 255, 0.1); }
+.assigned-box button:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+    border-color: var(--text-dim);
+    color: var(--text-dim);
+}
+
 .device-tile-status {
     margin-top: 10px;
     font-size: 0.75rem;
