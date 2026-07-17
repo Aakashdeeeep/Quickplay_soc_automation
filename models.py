@@ -53,9 +53,14 @@ def get_device_by_id(device_id):
 
 
 def upsert_device(slot_id, device_type, last_known_ip, network,
-                   friendly_name=None, platform=None, touch_last_seen=True):
+                   friendly_name=None, platform=None, roku_app_id=None,
+                   touch_last_seen=True):
     """Create or update a device by slot_id. Used by manual seeding today
-    and by the scan/assign flow later."""
+    and by the scan/assign flow later.
+
+    roku_app_id is per-device: privately-distributed Roku channels (like
+    aha) can be assigned a different app ID on each Roku unit, so this
+    can't live in the global platform config."""
     conn = get_connection()
     try:
         last_seen = datetime.now(timezone.utc).isoformat() if touch_last_seen else None
@@ -68,19 +73,20 @@ def upsert_device(slot_id, device_type, last_known_ip, network,
                    SET device_type = ?, last_known_ip = ?, network = ?,
                        friendly_name = COALESCE(?, friendly_name),
                        platform = COALESCE(?, platform),
+                       roku_app_id = COALESCE(?, roku_app_id),
                        last_seen_timestamp = COALESCE(?, last_seen_timestamp)
                    WHERE slot_id = ?""",
                 (device_type, last_known_ip, network, friendly_name, platform,
-                 last_seen, slot_id),
+                 roku_app_id, last_seen, slot_id),
             )
         else:
             conn.execute(
                 """INSERT INTO devices
                    (slot_id, device_type, last_known_ip, network,
-                    friendly_name, platform, last_seen_timestamp)
-                   VALUES (?, ?, ?, ?, ?, ?, ?)""",
+                    friendly_name, platform, roku_app_id, last_seen_timestamp)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
                 (slot_id, device_type, last_known_ip, network,
-                 friendly_name, platform, last_seen),
+                 friendly_name, platform, roku_app_id, last_seen),
             )
         conn.commit()
         return get_device_by_slot(slot_id)

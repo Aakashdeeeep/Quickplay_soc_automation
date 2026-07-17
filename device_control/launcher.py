@@ -33,9 +33,11 @@ def launch_content(device, content_id, platform_key):
         return False, f"Unknown platform '{platform_key}'."
 
     if device_type == "roku":
-        return roku.launch_content(
-            ip, platform.get("roku_app_id"), content_id, DEFAULT_MEDIA_TYPE
-        )
+        # Privately-distributed channels (like aha) can have a different
+        # app ID per Roku unit, so a per-device value wins over the
+        # platform-wide default in config.py.
+        app_id = device.get("roku_app_id") or platform.get("roku_app_id")
+        return roku.launch_content(ip, app_id, content_id, DEFAULT_MEDIA_TYPE)
 
     if device_type in ("firetv", "androidtv", "chromecast-gtv"):
         package = platform.get("android_package")

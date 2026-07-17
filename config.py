@@ -30,7 +30,7 @@ ADB_PORT = 5555
 PLATFORMS = {
     "aha": {
         "label": "aha",
-        "roku_app_id": "",  # TODO: fill in aha's Roku channel ID once known
+        "roku_app_id": "577103",
         "android_package": "ahaflix.tv",
         "deep_link_template": "https://www.aha.video/movie/{content_id}",
     },
