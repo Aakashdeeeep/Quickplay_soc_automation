@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% block title %}Networks — SOC Wall Controller{% endblock %}
+{% block content %}
+<h1>Select a Network</h1>
+<div class="network-grid">
+    {% for key, net in networks.items() %}
+    <a class="network-card" href="{{ url_for('views.device_grid', network_name=key) }}">
+        <div class="network-card-label">{{ net.label }}</div>
+        <div class="network-card-count">{{ counts.get(key, 0) }} device(s) registered</div>
+    </a>
+    {% endfor %}
+</div>
+{% endblock %}

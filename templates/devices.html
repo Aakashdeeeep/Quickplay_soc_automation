@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% block title %}{{ network_label }} — SOC Wall Controller{% endblock %}
+{% block content %}
+<div class="page-header">
+    <a href="{{ url_for('views.networks') }}" class="back-link">&larr; Networks</a>
+    <h1>{{ network_label }}</h1>
+</div>
+
+{% if not devices %}
+<p class="empty-state">
+    No devices registered on this network yet. Use <code>seed_devices.py</code> to add some
+    (scan/discovery UI lands in a later phase).
+</p>
+{% endif %}
+
+<div class="device-grid" data-network="{{ network_name }}">
+    {% for device in devices %}
+    <div class="device-tile"
+         data-slot-id="{{ device.slot_id }}"
+         data-device-type="{{ device.device_type }}"
+         data-platform="{{ device.platform or '' }}">
+        <div class="device-tile-icon">{{ device_icons.get(device.device_type, '❓') }}</div>
+        <div class="device-tile-slot">{{ device.friendly_name or device.slot_id }}</div>
+        <div class="device-tile-type">{{ device.device_type }}</div>
+        <div class="device-tile-ip">{{ device.last_known_ip or 'no IP' }}</div>
+        <div class="device-tile-status status-unknown" data-status-badge>checking…</div>
+    </div>
+    {% endfor %}
+</div>
+
+<div id="launch-modal" class="modal hidden">
+    <div class="modal-box">
+        <button class="modal-close" id="modal-close">&times;</button>
+        <h2 id="modal-slot-title">Launch content</h2>
+
+        <label for="platform-select">Platform</label>
+        <select id="platform-select">
+            {% for platform_key in presets.keys() %}
+            <option value="{{ platform_key }}">{{ platform_key }}</option>
+            {% endfor %}
+        </select>
+
+        <label for="preset-select">Preset title</label>
+        <select id="preset-select"></select>
+
+        <label for="custom-content-id">Or paste a custom content slug/ID</label>
+        <input type="text" id="custom-content-id" placeholder="e.g. constable">
+
+        <button id="launch-btn">Launch</button>
+        <div id="launch-result" class="launch-result"></div>
+    </div>
+</div>
+
+<script id="presets-data" type="application/json">{{ presets | tojson }}</script>
+<script src="{{ url_for('static', filename='js/app.js') }}"></script>
+{% endblock %}
