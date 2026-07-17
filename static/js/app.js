@@ -175,4 +175,35 @@
 
     refreshStatus();
     setInterval(refreshStatus, 15000);
+
+    const scanBtn = document.getElementById("scan-btn");
+    const scanStatus = document.getElementById("scan-status");
+
+    if (scanBtn) {
+        scanBtn.addEventListener("click", async () => {
+            scanBtn.disabled = true;
+            scanBtn.textContent = "Scanning...";
+            scanStatus.classList.remove("hidden");
+            scanStatus.textContent = `Scanning ${network} — this can take up to a minute...`;
+
+            try {
+                const resp = await fetch(`/api/scan/${encodeURIComponent(network)}`, { method: "POST" });
+                const data = await resp.json();
+                if (data.error) {
+                    scanStatus.textContent = `Scan failed: ${data.error}`;
+                } else {
+                    scanStatus.textContent =
+                        `Scan complete: ${data.matched.length} known device(s) updated, ` +
+                        `${data.unregistered.length} unregistered device(s) found, ` +
+                        `${data.cleared.length} no longer seen on ${network}. Reloading...`;
+                    setTimeout(() => window.location.reload(), 1500);
+                }
+            } catch (err) {
+                scanStatus.textContent = "Scan request failed: " + err;
+            } finally {
+                scanBtn.disabled = false;
+                scanBtn.textContent = "Scan this network";
+            }
+        });
+    }
 })();

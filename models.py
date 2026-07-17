@@ -141,6 +141,23 @@ def update_live_location(mac_address, last_known_ip, network):
         conn.close()
 
 
+def clear_live_location(mac_address):
+    """Clear IP/network for a device that was previously on a network but
+    wasn't found there in the most recent scan of that network. Does NOT
+    touch last_seen_timestamp — the device wasn't seen, so that field
+    should keep reflecting when it actually last was, not this scan."""
+    conn = get_connection()
+    try:
+        conn.execute(
+            "UPDATE devices SET last_known_ip = NULL, network = NULL WHERE mac_address = ?",
+            (mac_address,),
+        )
+        conn.commit()
+        return get_device_by_mac(mac_address)
+    finally:
+        conn.close()
+
+
 def touch_last_seen(slot_id):
     conn = get_connection()
     try:

@@ -4,12 +4,18 @@
 <div class="page-header">
     <a href="{{ url_for('views.networks') }}" class="back-link">&larr; Networks</a>
     <h1>{{ network_label }}</h1>
+    {% if scan_available %}
+    <button id="scan-btn" data-network="{{ network_name }}">Scan this network</button>
+    {% else %}
+    <button disabled title="Subnet not configured yet for this network">Scan this network</button>
+    {% endif %}
 </div>
+<div id="scan-status" class="scan-status hidden"></div>
 
 {% if not devices %}
 <p class="empty-state">
-    No devices registered on this network yet. Use <code>seed_devices.py</code> to add some
-    (scan/discovery UI lands in a later phase).
+    No devices registered on this network yet — either seed the registry (see <code>import_device_registry.py</code>)
+    or a device shows up here once a scan finds it on this network.
 </p>
 {% endif %}
 

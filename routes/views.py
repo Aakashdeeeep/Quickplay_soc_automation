@@ -41,4 +41,5 @@ def device_grid(network_name):
         presets=CONTENT_PRESETS,
         device_icons=DEVICE_ICONS,
         is_ops_restricted_platform=is_ops_restricted_platform,
+        scan_available=bool(NETWORKS[network_name].get("subnet_prefix")),
     )
