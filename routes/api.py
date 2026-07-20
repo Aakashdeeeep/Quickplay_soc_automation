@@ -7,13 +7,117 @@ from flask import Blueprint, request, jsonify
 import models
 import content_catalog
 import slot_naming
-from config import NETWORKS, ADB_DEVICE_TYPES, PACKAGE_TO_PLATFORM
+from config import NETWORKS, DEVICE_TYPES, ADB_DEVICE_TYPES, PACKAGE_TO_PLATFORM
 from device_control import status as status_control
 from device_control import launcher
 from device_control import scanner
 from device_control import adb as adb_control
 
 api_bp = Blueprint("api", __name__, url_prefix="/api")
+
+
+def _clean(value):
+    """Blank-string-to-None normalization for form/JSON input."""
+    if value is None:
+        return None
+    value = value.strip()
+    return value or None
+
+
+@api_bp.route("/devices", methods=["GET"])
+def list_devices_route():
+    """Full registry listing — powers the admin device management table."""
+    return jsonify(models.list_devices())
+
+
+@api_bp.route("/devices", methods=["POST"])
+def create_device_route():
+    """Add a new device to the registry via the admin UI. A device with a
+    new TV-group prefix in its slot_id (e.g. "TV2-CH1") just shows up as a
+    new TV card on Screen 1 automatically — there's no separate "create a
+    TV" step."""
+    data = request.get_json(silent=True) or {}
+    slot_id = _clean(data.get("slot_id"))
+    device_type = _clean(data.get("device_type"))
+
+    if not slot_id or not device_type:
+        return jsonify({"success": False, "message": "slot_id and device_type are required."}), 400
+    if device_type not in DEVICE_TYPES:
+        return jsonify({"success": False, "message": f"device_type must be one of: {', '.join(DEVICE_TYPES)}"}), 400
+    if models.get_device_by_slot(slot_id):
+        return jsonify({"success": False, "message": f"'{slot_id}' already exists — edit it instead."}), 409
+
+    mac_address = _clean(data.get("mac_address"))
+    if mac_address:
+        mac_address = mac_address.lower()
+        conflict = models.get_device_by_mac(mac_address)
+        if conflict:
+            return jsonify({
+                "success": False,
+                "message": f"MAC {mac_address} is already registered to '{conflict['slot_id']}'.",
+            }), 409
+
+    device = models.upsert_device(
+        slot_id=slot_id,
+        device_type=device_type,
+        last_known_ip=_clean(data.get("last_known_ip")),
+        network=_clean(data.get("network")),
+        friendly_name=_clean(data.get("friendly_name")),
+        platform=_clean(data.get("platform")),
+        roku_app_id=_clean(data.get("roku_app_id")),
+        mac_address=mac_address,
+        touch_last_seen=False,
+    )
+    return jsonify({"success": True, "device": device})
+
+
+@api_bp.route("/devices/<slot_id>", methods=["PUT"])
+def update_device_route(slot_id):
+    """Edit an existing device via the admin UI. Any field present in the
+    request body is set exactly (including cleared to blank); anything
+    absent keeps its current value."""
+    existing = models.get_device_by_slot(slot_id)
+    if not existing:
+        return jsonify({"success": False, "message": f"No device with slot_id '{slot_id}'"}), 404
+
+    data = request.get_json(silent=True) or {}
+
+    def field(name):
+        return _clean(data[name]) if name in data else existing[name]
+
+    device_type = field("device_type") or existing["device_type"]
+    if device_type not in DEVICE_TYPES:
+        return jsonify({"success": False, "message": f"device_type must be one of: {', '.join(DEVICE_TYPES)}"}), 400
+
+    mac_address = field("mac_address")
+    if mac_address:
+        mac_address = mac_address.lower()
+        conflict = models.get_device_by_mac(mac_address)
+        if conflict and conflict["slot_id"] != slot_id:
+            return jsonify({
+                "success": False,
+                "message": f"MAC {mac_address} is already registered to '{conflict['slot_id']}'.",
+            }), 409
+
+    device = models.replace_device_fields(
+        slot_id=slot_id,
+        device_type=device_type,
+        last_known_ip=field("last_known_ip"),
+        network=field("network"),
+        friendly_name=field("friendly_name"),
+        platform=field("platform"),
+        roku_app_id=field("roku_app_id"),
+        mac_address=mac_address,
+    )
+    return jsonify({"success": True, "device": device})
+
+
+@api_bp.route("/devices/<slot_id>", methods=["DELETE"])
+def delete_device_route(slot_id):
+    if not models.get_device_by_slot(slot_id):
+        return jsonify({"success": False, "message": f"No device with slot_id '{slot_id}'"}), 404
+    models.delete_device(slot_id)
+    return jsonify({"success": True})
 
 
 @api_bp.route("/network/<network_name>/status")

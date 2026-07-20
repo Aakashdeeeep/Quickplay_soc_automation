@@ -115,6 +115,31 @@ def upsert_device(slot_id, device_type, last_known_ip, network,
         conn.close()
 
 
+def replace_device_fields(slot_id, device_type, last_known_ip, network,
+                           friendly_name, platform, roku_app_id, mac_address):
+    """Direct-assignment update for the admin edit UI: every field is set
+    exactly to the given value, including None to actually clear it —
+    unlike upsert_device's COALESCE-based partial-merge (which exists so
+    CLI/import tools that only pass a few fields don't blank the rest).
+    Caller must resolve "unchanged" fields to their current value first;
+    slot_id must already exist."""
+    conn = get_connection()
+    try:
+        conn.execute(
+            """UPDATE devices
+               SET device_type = ?, last_known_ip = ?, network = ?,
+                   friendly_name = ?, platform = ?, roku_app_id = ?,
+                   mac_address = ?
+               WHERE slot_id = ?""",
+            (device_type, last_known_ip, network, friendly_name, platform,
+             roku_app_id, mac_address, slot_id),
+        )
+        conn.commit()
+        return get_device_by_slot(slot_id)
+    finally:
+        conn.close()
+
+
 def update_live_location(mac_address, last_known_ip, network):
     """Refresh the transient IP/network/last_seen fields for the device
     identified by its permanent MAC address. Used by the (future) scan

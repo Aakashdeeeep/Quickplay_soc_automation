@@ -9,7 +9,10 @@
 <body>
     <header class="topbar">
         <a href="{{ url_for('views.tv_selector') }}" class="brand">SOC Wall Controller</a>
-        <a href="{{ url_for('views.networks') }}" class="admin-link">Admin / Scan</a>
+        <nav class="admin-nav">
+            <a href="{{ url_for('views.admin_devices') }}" class="admin-link">Manage Devices</a>
+            <a href="{{ url_for('views.networks') }}" class="admin-link">Admin / Scan</a>
+        </nav>
     </header>
     <main class="content">
         {% block content %}{% endblock %}

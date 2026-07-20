@@ -36,12 +36,57 @@ body {
     font-weight: 600;
 }
 
+.admin-nav { display: flex; gap: 18px; }
+
 .admin-link {
     color: var(--text-dim);
     text-decoration: none;
     font-size: 0.85rem;
 }
 .admin-link:hover { color: var(--text); }
+
+.table-wrap {
+    margin-top: 20px;
+    overflow-x: auto;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+}
+
+.device-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.85rem;
+}
+.device-table th,
+.device-table td {
+    padding: 10px 14px;
+    text-align: left;
+    white-space: nowrap;
+    border-bottom: 1px solid var(--border);
+}
+.device-table th {
+    color: var(--text-dim);
+    font-weight: 600;
+    text-transform: uppercase;
+    font-size: 0.7rem;
+    letter-spacing: 0.04em;
+    background: var(--panel);
+}
+.device-table tbody tr:hover { background: var(--panel-hover); }
+.device-table tbody tr:last-child td { border-bottom: none; }
+
+.table-actions { display: flex; gap: 8px; }
+.table-actions button {
+    padding: 4px 10px;
+    font-size: 0.75rem;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--text);
+    cursor: pointer;
+}
+.table-actions button:hover { border-color: var(--accent); color: var(--accent); }
+.delete-device-btn:hover { border-color: var(--red) !important; color: var(--red) !important; }
 
 .content {
     padding: 24px;

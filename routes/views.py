@@ -13,7 +13,7 @@ the Scan Network button still lives.
 
 from flask import Blueprint, render_template, abort
 
-from config import NETWORKS, CONTENT_PRESETS, is_ops_restricted_platform
+from config import NETWORKS, CONTENT_PRESETS, DEVICE_TYPES, is_ops_restricted_platform
 import models
 import content_catalog
 import slot_naming
@@ -68,6 +68,19 @@ def tv_device_grid(tv_id):
         device_icons=DEVICE_ICONS,
         is_ops_restricted_platform=is_ops_restricted_platform,
         presets=CONTENT_PRESETS,
+    )
+
+
+@views_bp.route("/admin/devices")
+def admin_devices():
+    """Device registry management: add/edit/delete devices through the UI
+    instead of the CLI scripts (seed_devices.py / import_device_registry.py)."""
+    devices = models.list_devices()
+    return render_template(
+        "admin_devices.html",
+        devices=devices,
+        device_types=DEVICE_TYPES,
+        networks=NETWORKS,
     )
 
 
