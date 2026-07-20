@@ -111,6 +111,27 @@ def launch_content(ip, package_name, deep_link_url=None):
     return True, f"Launched {package_name} on {ip}."
 
 
+def list_installed_packages(ip):
+    """Real installed-app data via `pm list packages` — used to power the
+    dashboard's app selector. Returns a set of package names, or None if
+    the device isn't authorized/reachable (caller should fall back to the
+    content catalog's assigned platform in that case)."""
+    state = get_device_state(ip)
+    if state != "device":
+        return None
+
+    returncode, stdout, _ = _run(["-s", _serial(ip), "shell", "pm", "list", "packages"])
+    if returncode != 0:
+        return None
+
+    packages = set()
+    for line in stdout.splitlines():
+        line = line.strip()
+        if line.startswith("package:"):
+            packages.add(line[len("package:"):])
+    return packages
+
+
 def get_model(ip):
     """Query device model string — used to distinguish Fire TV vs Xiaomi
     Mi TV vs Chromecast w/ Google TV during scan/status. Returns None if

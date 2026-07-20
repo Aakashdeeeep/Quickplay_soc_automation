@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% block title %}SOC Wall Controller{% endblock %}
+{% block content %}
+<h1>Select a TV</h1>
+
+{% if not groups %}
+<p class="empty-state">
+    No devices registered yet. Import a device registry batch
+    (<code>import_device_registry.py</code>) to get started.
+</p>
+{% endif %}
+
+<div class="tv-selector-grid">
+    {% for g in groups %}
+    <a class="tv-card" href="{{ url_for('views.tv_device_grid', tv_id=g.tv_id) }}">
+        <div class="tv-card-label">{{ g.tv_id }}</div>
+        <div class="tv-card-count">{{ g.device_count }} device{{ '' if g.device_count == 1 else 's' }}</div>
+    </a>
+    {% endfor %}
+</div>
+{% endblock %}

@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+{% block title %}{{ tv_id }} — SOC Wall Controller{% endblock %}
+{% block content %}
+<div class="page-header">
+    <a href="{{ url_for('views.tv_selector') }}" class="back-link">&larr; TVs</a>
+    <h1>{{ tv_id }}</h1>
+</div>
+
+<div class="tv-grid" data-tv-id="{{ tv_id }}">
+    {% for device in devices %}
+    {% set entry = catalog_by_slot.get(device.slot_id) %}
+    <div class="tv-tile"
+         data-slot-id="{{ device.slot_id }}"
+         data-device-type="{{ device.device_type }}"
+         data-network="{{ device.network or '' }}"
+         data-ip="{{ device.last_known_ip or '' }}"
+         data-channel="{{ device.channel if device.channel is not none else '' }}">
+        <div class="tv-tile-top">
+            <span class="tv-tile-channel">{{ ('CH' ~ device.channel) if device.channel is not none else device.slot_id }}</span>
+            <span class="status-dot status-dot-unknown" data-status-dot title="checking..."></span>
+        </div>
+        <div class="tv-tile-icon">{{ device_icons.get(device.device_type, '❓') }}</div>
+        <div class="tv-tile-type">{{ device.device_type }}</div>
+        {% if entry %}
+        <div class="tv-tile-assigned">{{ entry.platform }}</div>
+        {% else %}
+        <div class="tv-tile-assigned tv-tile-assigned-empty">unassigned</div>
+        {% endif %}
+    </div>
+    {% endfor %}
+</div>
+
+<div id="action-overlay" class="modal hidden">
+    <div class="modal-box action-box">
+        <button class="modal-close" id="overlay-close">&times;</button>
+
+        <div class="device-info-header">
+            <div class="device-info-channel" id="info-channel"></div>
+            <div class="device-info-meta" id="info-meta"></div>
+        </div>
+
+        <div class="section-label">App</div>
+        <div id="app-selector" class="chip-row"></div>
+        <div id="app-selector-empty" class="empty-note hidden">
+            No app info available for this device yet — use Advanced entry below.
+        </div>
+
+        <div class="section-label">Content type</div>
+        <div class="toggle-row">
+            <button type="button" class="toggle-btn" data-content-type="Live">LIVE</button>
+            <button type="button" class="toggle-btn" data-content-type="VOD">VOD</button>
+        </div>
+
+        <button id="primary-launch-btn" disabled>Launch</button>
+        <div id="primary-launch-result" class="launch-result"></div>
+
+        <details id="advanced-section" class="advanced-section">
+            <summary>Advanced: manual entry</summary>
+
+            <label for="adv-platform">Platform</label>
+            <select id="adv-platform">
+                {% for platform_key in presets.keys() %}
+                <option value="{{ platform_key }}">{{ platform_key }}</option>
+                {% endfor %}
+            </select>
+
+            <label for="adv-preset">Preset title</label>
+            <select id="adv-preset"></select>
+
+            <label for="adv-content-id">Or paste a custom content slug/ID</label>
+            <input type="text" id="adv-content-id" placeholder="e.g. constable">
+
+            <button id="adv-launch-btn" type="button">Launch (Advanced)</button>
+            <div id="adv-launch-result" class="launch-result"></div>
+        </details>
+    </div>
+</div>
+
+<script id="presets-data" type="application/json">{{ presets | tojson }}</script>
+<script src="{{ url_for('static', filename='js/tv_dashboard.js') }}"></script>
+{% endblock %}

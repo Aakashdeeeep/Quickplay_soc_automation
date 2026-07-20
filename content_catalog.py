@@ -8,7 +8,10 @@ the content assignment.
 slot_id is the join key back to devices.slot_id (models.py).
 """
 
+import random
+
 from db import get_connection
+from config import resolve_platform_key
 
 
 def list_catalog():
@@ -77,6 +80,49 @@ def upsert_entry(slot_id, tv_id, channel, device_type, platform, content_title,
         return get_by_slot(slot_id)
     finally:
         conn.close()
+
+
+def list_by_platform_and_type(platform, content_type):
+    """All catalog entries (across any slot) matching a platform + content
+    type, compared via the same platform-key normalization the launcher
+    uses (so "aha Telugu" matches a search for "aha"). Only rows with a
+    real content_id are eligible — a human title alone isn't a safe
+    launchable slug."""
+    target_key = resolve_platform_key(platform)
+    conn = get_connection()
+    try:
+        rows = conn.execute(
+            "SELECT * FROM content_catalog WHERE content_type = ? AND content_id IS NOT NULL",
+            (content_type,),
+        ).fetchall()
+        return [dict(r) for r in rows if resolve_platform_key(r["platform"]) == target_key]
+    finally:
+        conn.close()
+
+
+def find_title_for_launch(slot_id, platform, content_type):
+    """Resolve what to actually launch for slot_id + chosen app + Live/VOD:
+    1. If this slot's own catalog entry matches the chosen platform+type
+       (and has a content_id), use it — deterministic, the "assigned" case.
+    2. Otherwise, randomly pick a matching entry from anywhere else in the
+       catalog for that platform+type — the "no specific title assigned
+       here, but we know of one elsewhere" fallback.
+    3. If nothing matches at all, return None.
+
+    Returns a dict with an added "source" key ("assigned" or
+    "catalog-random"), or None.
+    """
+    target_key = resolve_platform_key(platform)
+
+    own = get_by_slot(slot_id)
+    if (own and own["content_id"] and own["content_type"] == content_type
+            and resolve_platform_key(own["platform"]) == target_key):
+        return {**own, "source": "assigned"}
+
+    candidates = list_by_platform_and_type(platform, content_type)
+    if not candidates:
+        return None
+    return {**random.choice(candidates), "source": "catalog-random"}
 
 
 def delete_entry(slot_id):

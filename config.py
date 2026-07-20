@@ -84,6 +84,15 @@ def resolve_platform_key(platform):
         return "aha"
     return normalized.replace(" ", "_")
 
+# Android package name -> friendly platform name, for mapping real
+# `adb shell pm list packages` output to something an operator recognizes.
+# Only "aha" is confirmed right now — anything installed that isn't in
+# this map is simply not offered as a selectable app (better than showing
+# raw package names), and the UI falls back to the content catalog.
+PACKAGE_TO_PLATFORM = {
+    "ahaflix.tv": "aha",
+}
+
 # Preset content titles shown in the launch dropdown, per platform.
 # content_id is the slug used both for Roku ECP contentId and the Android
 # deep-link URL.
