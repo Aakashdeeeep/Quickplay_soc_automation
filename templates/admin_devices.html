@@ -4,12 +4,13 @@
 <div class="page-header">
     <a href="{{ url_for('views.tv_selector') }}" class="back-link">&larr; Dashboard</a>
     <h1>Manage Devices</h1>
-    <button id="add-device-btn">+ Add Device</button>
+    <button id="add-tv-btn">+ Add TV</button>
+    <button id="add-device-btn" class="btn-secondary">+ Add Device</button>
 </div>
 
 <p class="empty-state">
-    Adding a device with a new TV prefix (e.g. <code>TV2-CH1</code>) creates that TV card on the dashboard
-    automatically — there's no separate "add TV" step.
+    Use <strong>+ Add TV</strong> to register a whole TV's channels at once. A new TV prefix
+    (e.g. <code>TV2-CH1</code>) shows up as a new TV card on the dashboard automatically.
 </p>
 
 <div class="table-wrap">
@@ -101,5 +102,45 @@
     </div>
 </div>
 
+<div id="add-tv-modal" class="modal hidden">
+    <div class="modal-box add-tv-box">
+        <button class="modal-close" id="add-tv-modal-close">&times;</button>
+        <h2>Add TV</h2>
+
+        <label for="tv-name">TV name</label>
+        <input type="text" id="tv-name" placeholder="e.g. TV2">
+
+        <label for="tv-channel-count">Number of channels</label>
+        <input type="number" id="tv-channel-count" value="16" min="1" max="64">
+
+        <button id="tv-generate-btn" type="button">Generate rows</button>
+
+        <div id="tv-rows-section" class="tv-rows-section hidden">
+            <div class="fill-all-row">
+                <label for="tv-fill-type">Set device type for all:</label>
+                <select id="tv-fill-type">
+                    {% for dt in device_types %}
+                    <option value="{{ dt }}">{{ dt }}</option>
+                    {% endfor %}
+                </select>
+                <button id="tv-fill-all-btn" type="button" class="btn-secondary">Apply to all</button>
+            </div>
+
+            <div class="table-wrap">
+            <table class="device-table">
+                <thead>
+                    <tr><th>Channel</th><th>Device type</th><th>MAC address (optional)</th></tr>
+                </thead>
+                <tbody id="tv-rows-body"></tbody>
+            </table>
+            </div>
+
+            <button id="tv-create-btn">Create TV</button>
+            <div id="tv-create-result" class="launch-result"></div>
+        </div>
+    </div>
+</div>
+
+<script id="device-types-data" type="application/json">{{ device_types | tojson }}</script>
 <script src="{{ url_for('static', filename='js/admin_devices.js') }}"></script>
 {% endblock %}

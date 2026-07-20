@@ -75,6 +75,61 @@ body {
 .device-table tbody tr:hover { background: var(--panel-hover); }
 .device-table tbody tr:last-child td { border-bottom: none; }
 
+.add-tv-box { width: 560px; max-width: 90vw; }
+
+.tv-rows-section { margin-top: 20px; }
+.tv-rows-section.hidden { display: none; }
+
+.fill-all-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 14px;
+}
+.fill-all-row label { margin: 0; white-space: nowrap; color: var(--text-dim); font-size: 0.85rem; }
+.fill-all-row select { width: auto; }
+
+#tv-rows-body select,
+#tv-rows-body input {
+    width: 100%;
+    padding: 6px 8px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--text);
+    font-size: 0.85rem;
+}
+
+#tv-create-btn {
+    margin-top: 16px;
+    width: 100%;
+    padding: 10px;
+    background: var(--accent);
+    border: none;
+    border-radius: 6px;
+    color: white;
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+}
+#tv-create-btn:hover { opacity: 0.9; }
+#tv-create-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+#tv-generate-btn {
+    margin-top: 14px;
+    width: 100%;
+    padding: 8px;
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--text);
+    border-radius: 6px;
+    cursor: pointer;
+}
+#tv-generate-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+.row-result-ok { color: var(--green); }
+.row-result-fail { color: var(--red); }
+
 .table-actions { display: flex; gap: 8px; }
 .table-actions button {
     padding: 4px 10px;
@@ -114,6 +169,13 @@ h1 { margin-top: 0; }
     cursor: pointer;
 }
 .page-header button:hover { opacity: 0.9; }
+.page-header button.btn-secondary {
+    margin-left: 0;
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--text);
+}
+.page-header button.btn-secondary:hover { border-color: var(--accent); color: var(--accent); opacity: 1; }
 .page-header button:disabled {
     opacity: 0.4;
     cursor: not-allowed;

@@ -30,32 +30,32 @@ def list_devices_route():
     return jsonify(models.list_devices())
 
 
-@api_bp.route("/devices", methods=["POST"])
-def create_device_route():
-    """Add a new device to the registry via the admin UI. A device with a
-    new TV-group prefix in its slot_id (e.g. "TV2-CH1") just shows up as a
-    new TV card on Screen 1 automatically — there's no separate "create a
-    TV" step."""
-    data = request.get_json(silent=True) or {}
+def _create_one_device(data, seen_macs):
+    """Shared validation + insert for both the single-device and bulk
+    create endpoints. seen_macs tracks MACs already claimed earlier in the
+    same batch, so two new rows in one bulk submission can't both grab the
+    same MAC before either is committed to the DB.
+
+    Returns (success: bool, message: str, device: dict|None)."""
     slot_id = _clean(data.get("slot_id"))
     device_type = _clean(data.get("device_type"))
 
     if not slot_id or not device_type:
-        return jsonify({"success": False, "message": "slot_id and device_type are required."}), 400
+        return False, "slot_id and device_type are required.", None
     if device_type not in DEVICE_TYPES:
-        return jsonify({"success": False, "message": f"device_type must be one of: {', '.join(DEVICE_TYPES)}"}), 400
+        return False, f"device_type must be one of: {', '.join(DEVICE_TYPES)}", None
     if models.get_device_by_slot(slot_id):
-        return jsonify({"success": False, "message": f"'{slot_id}' already exists — edit it instead."}), 409
+        return False, f"'{slot_id}' already exists — edit it instead.", None
 
     mac_address = _clean(data.get("mac_address"))
     if mac_address:
         mac_address = mac_address.lower()
+        if mac_address in seen_macs:
+            return False, f"MAC {mac_address} is used more than once in this batch.", None
         conflict = models.get_device_by_mac(mac_address)
         if conflict:
-            return jsonify({
-                "success": False,
-                "message": f"MAC {mac_address} is already registered to '{conflict['slot_id']}'.",
-            }), 409
+            return False, f"MAC {mac_address} is already registered to '{conflict['slot_id']}'.", None
+        seen_macs.add(mac_address)
 
     device = models.upsert_device(
         slot_id=slot_id,
@@ -68,7 +68,51 @@ def create_device_route():
         mac_address=mac_address,
         touch_last_seen=False,
     )
+    return True, f"Created {slot_id}.", device
+
+
+@api_bp.route("/devices", methods=["POST"])
+def create_device_route():
+    """Add a new device to the registry via the admin UI. A device with a
+    new TV-group prefix in its slot_id (e.g. "TV2-CH1") just shows up as a
+    new TV card on Screen 1 automatically — there's no separate "create a
+    TV" step."""
+    data = request.get_json(silent=True) or {}
+    success, message, device = _create_one_device(data, set())
+    if not success:
+        status = 409 if "already" in message or "more than once" in message else 400
+        return jsonify({"success": False, "message": message}), status
     return jsonify({"success": True, "device": device})
+
+
+@api_bp.route("/devices/bulk", methods=["POST"])
+def create_devices_bulk_route():
+    """Add many devices in one go — e.g. all of a new TV's channels at
+    once — instead of the admin UI's single-device form N times over.
+    Partial success is expected and reported per-row: one bad MAC
+    shouldn't block the rest of the batch."""
+    data = request.get_json(silent=True) or {}
+    devices_in = data.get("devices")
+    if not isinstance(devices_in, list) or not devices_in:
+        return jsonify({"success": False, "message": "devices must be a non-empty list."}), 400
+
+    seen_macs = set()
+    results = []
+    for row in devices_in:
+        success, message, device = _create_one_device(row, seen_macs)
+        results.append({
+            "slot_id": row.get("slot_id"),
+            "success": success,
+            "message": message,
+        })
+
+    created_count = sum(1 for r in results if r["success"])
+    return jsonify({
+        "success": created_count > 0,
+        "created_count": created_count,
+        "total": len(results),
+        "results": results,
+    })
 
 
 @api_bp.route("/devices/<slot_id>", methods=["PUT"])
