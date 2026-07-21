@@ -21,19 +21,44 @@ class LaunchError(Exception):
     pass
 
 
-def _expand_nav_sequence(nav_sequence):
-    """Parse a nav_sequence string into a concrete list of keyevent names.
-    Most tokens are a plain key name (e.g. "DPAD_DOWN"). A token can also
-    be "KEY*N" (press KEY exactly N times) or "KEY*MIN-MAX" (press KEY a
-    random number of times in that inclusive range each run) — used to
-    land on a different item in a row each launch (e.g. a random highlight
-    clip) instead of always the same one."""
-    keys = []
+DEFAULT_SEEK_MAX_PRESSES = 10
+
+
+def _parse_nav_sequence(nav_sequence):
+    """Parse a nav_sequence string into a list of step dicts for
+    device_control.adb.send_key_sequence(). Comma-separated tokens, each
+    one of:
+      "KEY"              — press once
+      "KEY*N"            — press N times
+      "KEY*MIN-MAX"      — press a random number of times in that
+                            inclusive range each run (e.g. landing on a
+                            different item in a row, like a random movie,
+                            instead of always the same one)
+      "KEY?text1|text2"  — press KEY (up to DEFAULT_SEEK_MAX_PRESSES times)
+                            until the focused UI element's text matches
+                            one of text1/text2 — verified navigation that
+                            self-corrects if the app's layout has shifted,
+                            instead of trusting a fixed press-count that
+                            can silently land on the wrong row
+      "KEY?text1|text2:N" — same, with an explicit max press count
+    """
+    steps = []
     for token in nav_sequence.split(","):
         token = token.strip()
         if not token:
             continue
-        if "*" in token:
+
+        if "?" in token:
+            key, rest = token.split("?", 1)
+            key = key.strip()
+            if ":" in rest:
+                targets_part, max_part = rest.rsplit(":", 1)
+                max_presses = int(max_part.strip())
+            else:
+                targets_part, max_presses = rest, DEFAULT_SEEK_MAX_PRESSES
+            targets = [t.strip() for t in targets_part.split("|") if t.strip()]
+            steps.append({"type": "seek", "key": key, "targets": targets, "max": max_presses})
+        elif "*" in token:
             key, count_spec = token.split("*", 1)
             key = key.strip()
             count_spec = count_spec.strip()
@@ -42,10 +67,10 @@ def _expand_nav_sequence(nav_sequence):
                 count = random.randint(int(lo), int(hi))
             else:
                 count = int(count_spec)
-            keys.extend([key] * count)
+            steps.append({"type": "press", "key": key, "count": count})
         else:
-            keys.append(token)
-    return keys
+            steps.append({"type": "press", "key": token, "count": 1})
+    return steps
 
 
 def launch_content(device, content_id, platform_label, nav_sequence=None):
@@ -57,15 +82,15 @@ def launch_content(device, content_id, platform_label, nav_sequence=None):
     platform_label: free-text platform name — either a PLATFORMS config key
     (e.g. "aha") from manual entry, or a raw content_catalog platform string
     (e.g. "aha Telugu") from the assigned-title dropdown.
-    nav_sequence: comma-separated Android keyevent names (e.g.
-    "DPAD_LEFT,DPAD_DOWN,DPAD_CENTER") simulating remote-control button
-    presses to reach specific content — for platforms where playback needs
-    a real backend/DRM handshake a URL can't trigger (confirmed on Unifi
-    TV). A token can be "KEY*N" or "KEY*MIN-MAX" to repeat a key N times or
-    a random count in that range each run (e.g. landing on a different item
-    in a row, like a random highlight clip, instead of always the same
-    one). Takes priority over content_id/deep-linking when present, and
-    only applies to ADB-controlled devices.
+    nav_sequence: comma-separated navigation tokens (see _parse_nav_sequence
+    for the grammar) simulating remote-control button presses to reach
+    specific content — for platforms where playback needs a real backend/
+    DRM handshake a URL can't trigger (confirmed on Unifi TV). Supports
+    verified "seek" tokens that check the actually-focused UI element
+    before continuing, so navigation self-corrects instead of trusting a
+    fixed press-count that can drift when the app's layout shifts. Takes
+    priority over content_id/deep-linking when present, and only applies
+    to ADB-controlled devices.
 
     Returns (success: bool, message: str) — never raises for expected
     failure modes (offline, unauthorized, restricted, etc.), so routes can
@@ -109,8 +134,8 @@ def launch_content(device, content_id, platform_label, nav_sequence=None):
         adb_port = device.get("adb_port")  # per-device: Wireless Debugging uses a random port
 
         if nav_sequence:
-            keys = _expand_nav_sequence(nav_sequence)
-            return adb.send_key_sequence(ip, package, keys, port=adb_port)
+            steps = _parse_nav_sequence(nav_sequence)
+            return adb.send_key_sequence(ip, package, steps, port=adb_port)
 
         template = platform.get("deep_link_template")
         # Blank content_id means "just open the app" (e.g. no working

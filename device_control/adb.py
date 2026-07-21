@@ -21,10 +21,12 @@ of for status.
 
 import subprocess
 import time
+import xml.etree.ElementTree as ET
 
 from config import ADB_PORT, ADB_COMMAND_TIMEOUT
 
 NAV_KEY_DELAY_SECONDS = 0.5
+UI_DUMP_PATH = "/sdcard/window_dump.xml"
 
 
 class AdbError(Exception):
@@ -129,29 +131,126 @@ def launch_content(ip, package_name, deep_link_url=None, port=None):
     return True, f"Launched {package_name} on {ip}."
 
 
-def send_key_sequence(ip, package_name, keys, port=None, key_delay=NAV_KEY_DELAY_SECONDS):
-    """Launch an app plainly, then simulate a sequence of remote-control
-    button presses to navigate to and play specific content — for
-    platforms where playback requires a real backend/DRM handshake that
-    a URL deep link can't trigger (confirmed on Unifi TV: its player
-    calls its own oauth2/device-register/content-authorize/widevine-
-    license APIs when a human selects a channel in the running app;
-    there's no equivalent URL shortcut for that).
+def _press_key(serial, key):
+    return _run(["-s", serial, "shell", "input", "keyevent", f"KEYCODE_{key}"])
 
-    keys: list of Android keyevent names without the "KEYCODE_" prefix,
-    e.g. ["DPAD_LEFT", "DPAD_DOWN", "DPAD_DOWN", "DPAD_CENTER"].
+
+def _first_text_in_subtree(node):
+    """Depth-first search for the first non-empty text/content-desc in a
+    node or its descendants. Needed because many TV apps' focused/selected
+    node is a plain layout container (empty text of its own) wrapping the
+    actual label as a child TextView — confirmed on Unifi TV: the node
+    with focused="true" was an empty ViewGroup, with "Free" living on a
+    child node several levels down."""
+    text = (node.get("text") or "").strip()
+    if text:
+        return text
+    desc = (node.get("content-desc") or "").strip()
+    if desc:
+        return desc
+    for child in node:
+        found = _first_text_in_subtree(child)
+        if found:
+            return found
+    return None
+
+
+def get_focused_element_text(serial):
+    """Dump the current UI via `uiautomator dump` and return the label of
+    whichever element currently has focus (or, failing that, is marked
+    selected), or None if the dump fails or nothing is focused/selected.
+    This is how nav_sequence "seek" steps verify they've actually reached
+    a target screen/item, instead of trusting a fixed press-count that
+    drifts whenever the app's layout changes (confirmed: a promotional row
+    above the target row can appear/disappear between sessions, shifting a
+    fixed count out from under it)."""
+    dump_result = _run(["-s", serial, "shell", "uiautomator", "dump", UI_DUMP_PATH], timeout=10)
+    if dump_result[0] != 0:
+        return None
+
+    cat_result = _run(["-s", serial, "shell", "cat", UI_DUMP_PATH], timeout=10)
+    if cat_result[0] != 0 or not cat_result[1]:
+        return None
+
+    xml_text = cat_result[1]
+    # uiautomator sometimes prints a "UI hierchary dumped to..." status
+    # line before the XML — trim to the actual document.
+    start = xml_text.find("<?xml")
+    if start > 0:
+        xml_text = xml_text[start:]
+
+    try:
+        root = ET.fromstring(xml_text)
+    except ET.ParseError:
+        return None
+
+    target = None
+    for node in root.iter("node"):
+        if node.get("focused") == "true":
+            target = node
+            break
+    if target is None:
+        for node in root.iter("node"):
+            if node.get("selected") == "true":
+                target = node
+                break
+    if target is None:
+        return None
+
+    return _first_text_in_subtree(target)
+
+
+def _seek_focused(serial, key, targets, max_presses, delay):
+    """Press `key` up to max_presses times, checking the focused element's
+    text/content-desc after each press (and once before, in case we're
+    already there), stopping as soon as it case-insensitively contains
+    any of `targets`. Returns (found: bool, last_seen_text: str|None)."""
+    last_text = None
+    for attempt in range(max_presses + 1):
+        current = get_focused_element_text(serial)
+        if current is not None:
+            last_text = current
+            if any(t.lower() in current.lower() for t in targets):
+                return True, current
+        if attempt == max_presses:
+            break
+        _press_key(serial, key)
+        time.sleep(delay)
+    return False, last_text
+
+
+def send_key_sequence(ip, package_name, steps, port=None, key_delay=NAV_KEY_DELAY_SECONDS):
+    """Launch an app plainly, then execute a sequence of remote-control
+    navigation steps to reach and play specific content — for platforms
+    where playback requires a real backend/DRM handshake that a URL deep
+    link can't trigger (confirmed on Unifi TV: its player calls its own
+    oauth2/device-register/content-authorize/widevine-license APIs when a
+    human selects a channel in the running app; there's no equivalent URL
+    shortcut for that).
+
+    steps: list of dicts, each one of:
+      {"type": "press", "key": "DPAD_DOWN", "count": 1}
+          — press `key` exactly `count` times, no verification.
+      {"type": "seek", "key": "DPAD_DOWN", "targets": ["Free"], "max": 10}
+          — press `key` up to `max` times, stopping as soon as the
+            focused element's text matches one of `targets`. This is what
+            makes navigation robust to the app's layout shifting between
+            sessions, instead of a fixed count silently landing on the
+            wrong row.
+    See device_control/launcher.py's _parse_nav_sequence() for the string
+    grammar these get built from.
 
     Returns (True, message) on success, (False, message) on failure.
-    Fragile by nature — this replays a fixed path through the app's menu,
-    so it breaks if the app's layout changes.
+    Still fragile in the sense that it replays a specific path through the
+    app's menu — if a seek step can't find its target at all, it gives up
+    after `max` presses and continues anyway (best-effort), so a launch
+    can still land on the wrong screen if the app changes more than the
+    seek steps account for.
 
     Always force-stops the app before relaunching it, even if it's already
     running — a recorded sequence assumes a fresh Home/start screen, and if
     the app was left mid-playback from a previous launch, simply bringing
-    it to the foreground resumes that same screen instead of resetting it,
-    so the blind key presses land in the wrong place (confirmed: this is
-    why a sequence that worked once could fail right after another launch
-    left something playing).
+    it to the foreground resumes that same screen instead of resetting it.
     """
     state = ensure_connected(ip, port)
 
@@ -180,15 +279,29 @@ def send_key_sequence(ip, package_name, keys, port=None, key_delay=NAV_KEY_DELAY
 
     time.sleep(1.5)  # let the app come to the foreground before navigating
 
-    for key in keys:
-        returncode, stdout, stderr = _run(["-s", serial, "shell", "input", "keyevent", f"KEYCODE_{key}"])
-        if returncode is None:
-            return False, f"adb command to {ip} timed out partway through navigation."
-        if returncode != 0:
-            return False, f"Navigation key '{key}' failed on {ip}: {stderr or stdout}"
-        time.sleep(key_delay)
+    seek_notes = []
+    for step in steps:
+        if step["type"] == "seek":
+            found, last_seen = _seek_focused(serial, step["key"], step["targets"], step["max"], key_delay)
+            if not found:
+                seek_notes.append(
+                    f"couldn't confirm reaching {step['targets']!r} within {step['max']} presses "
+                    f"of {step['key']} (last saw {last_seen!r}) — continued anyway"
+                )
+            continue
 
-    return True, f"Navigated to content on {ip} via {len(keys)} remote button presses."
+        for _ in range(step["count"]):
+            returncode, stdout, stderr = _press_key(serial, step["key"])
+            if returncode is None:
+                return False, f"adb command to {ip} timed out partway through navigation."
+            if returncode != 0:
+                return False, f"Navigation key '{step['key']}' failed on {ip}: {stderr or stdout}"
+            time.sleep(key_delay)
+
+    message = f"Navigated to content on {ip}."
+    if seek_notes:
+        message += " Warning: " + "; ".join(seek_notes)
+    return True, message
 
 
 def list_installed_packages(ip, port=None):
