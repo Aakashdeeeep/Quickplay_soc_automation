@@ -19,7 +19,7 @@ class LaunchError(Exception):
     pass
 
 
-def launch_content(device, content_id, platform_label):
+def launch_content(device, content_id, platform_label, nav_sequence=None):
     """device: a dict from models.py (must have device_type, last_known_ip,
     network).
     content_id: platform-specific slug/ID, either a preset or operator-pasted.
@@ -28,6 +28,12 @@ def launch_content(device, content_id, platform_label):
     platform_label: free-text platform name — either a PLATFORMS config key
     (e.g. "aha") from manual entry, or a raw content_catalog platform string
     (e.g. "aha Telugu") from the assigned-title dropdown.
+    nav_sequence: comma-separated Android keyevent names (e.g.
+    "DPAD_LEFT,DPAD_DOWN,DPAD_CENTER") simulating remote-control button
+    presses to reach specific content — for platforms where playback needs
+    a real backend/DRM handshake a URL can't trigger (confirmed on Unifi
+    TV). Takes priority over content_id/deep-linking when present, and
+    only applies to ADB-controlled devices.
 
     Returns (success: bool, message: str) — never raises for expected
     failure modes (offline, unauthorized, restricted, etc.), so routes can
@@ -67,14 +73,19 @@ def launch_content(device, content_id, platform_label):
         package = platform.get("android_package")
         if not package:
             return False, f"No Android package configured for platform '{platform_key}'."
+
+        adb_port = device.get("adb_port")  # per-device: Wireless Debugging uses a random port
+
+        if nav_sequence:
+            keys = [k.strip() for k in nav_sequence.split(",") if k.strip()]
+            return adb.send_key_sequence(ip, package, keys, port=adb_port)
+
         template = platform.get("deep_link_template")
         # Blank content_id means "just open the app" (e.g. no working
         # deep-link format known yet for this platform) - only build a
         # deep link URL when there's an actual ID to put in it.
         deep_link_url = template.format(content_id=content_id) if template and content_id else None
-        # adb_port is per-device — devices paired via Android's on-device
-        # Wireless Debugging use a random port, not the fixed 5555 default.
-        return adb.launch_content(ip, package, deep_link_url, port=device.get("adb_port"))
+        return adb.launch_content(ip, package, deep_link_url, port=adb_port)
 
     if device_type == "appletv":
         return False, "AppleTV control is not implemented yet."

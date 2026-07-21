@@ -32,6 +32,7 @@ CREATE TABLE IF NOT EXISTS content_catalog (
     content_title TEXT NOT NULL,
     content_type TEXT NOT NULL,
     content_id TEXT,
+    nav_sequence TEXT,
     verified INTEGER DEFAULT 0,
     notes TEXT
 );
@@ -70,6 +71,16 @@ def _migrate(conn):
     # multiple NULLs. SQLite unique indexes already treat NULL as distinct
     # from other NULLs, so this doesn't need to be a partial index.
     conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_devices_mac_address ON devices(mac_address)")
+
+    catalog_columns = {row["name"] for row in conn.execute("PRAGMA table_info(content_catalog)")}
+    if "nav_sequence" not in catalog_columns:
+        # For platforms where playback needs a real backend/DRM handshake
+        # (confirmed on Unifi TV) rather than a URL deep link — a
+        # comma-separated sequence of Android keyevent names
+        # (e.g. "DPAD_LEFT,DPAD_DOWN,DPAD_CENTER") simulating a physical
+        # remote to navigate to and play specific content. See
+        # device_control/adb.py's send_key_sequence().
+        conn.execute("ALTER TABLE content_catalog ADD COLUMN nav_sequence TEXT")
 
 
 def init_db():

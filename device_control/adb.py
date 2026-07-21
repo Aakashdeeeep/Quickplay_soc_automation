@@ -20,8 +20,11 @@ of for status.
 """
 
 import subprocess
+import time
 
 from config import ADB_PORT, ADB_COMMAND_TIMEOUT
+
+NAV_KEY_DELAY_SECONDS = 0.5
 
 
 class AdbError(Exception):
@@ -124,6 +127,57 @@ def launch_content(ip, package_name, deep_link_url=None, port=None):
         return False, f"adb launch failed on {ip}: {stderr or stdout}"
 
     return True, f"Launched {package_name} on {ip}."
+
+
+def send_key_sequence(ip, package_name, keys, port=None, key_delay=NAV_KEY_DELAY_SECONDS):
+    """Launch an app plainly, then simulate a sequence of remote-control
+    button presses to navigate to and play specific content — for
+    platforms where playback requires a real backend/DRM handshake that
+    a URL deep link can't trigger (confirmed on Unifi TV: its player
+    calls its own oauth2/device-register/content-authorize/widevine-
+    license APIs when a human selects a channel in the running app;
+    there's no equivalent URL shortcut for that).
+
+    keys: list of Android keyevent names without the "KEYCODE_" prefix,
+    e.g. ["DPAD_LEFT", "DPAD_DOWN", "DPAD_DOWN", "DPAD_CENTER"].
+
+    Returns (True, message) on success, (False, message) on failure.
+    Fragile by nature — this replays a fixed path through the app's menu,
+    so it breaks if the app's layout changes.
+    """
+    state = ensure_connected(ip, port)
+
+    if state == "unauthorized":
+        return False, (
+            f"Device at {ip} is not authorized yet — accept the 'Allow debugging' "
+            "prompt (or pair it, if it uses Wireless Debugging) on the device, then try again."
+        )
+    if state in ("offline", "not_connected"):
+        return False, f"Could not reach ADB device at {ip} — device may be off or unreachable."
+
+    serial = _serial(ip, port)
+
+    returncode, stdout, stderr = _run([
+        "-s", serial, "shell", "monkey",
+        "-p", package_name,
+        "-c", "android.intent.category.LAUNCHER", "1",
+    ])
+    if returncode is None:
+        return False, f"adb command to {ip} timed out."
+    if returncode != 0:
+        return False, f"Failed to launch {package_name} on {ip}: {stderr or stdout}"
+
+    time.sleep(1.5)  # let the app come to the foreground before navigating
+
+    for key in keys:
+        returncode, stdout, stderr = _run(["-s", serial, "shell", "input", "keyevent", f"KEYCODE_{key}"])
+        if returncode is None:
+            return False, f"adb command to {ip} timed out partway through navigation."
+        if returncode != 0:
+            return False, f"Navigation key '{key}' failed on {ip}: {stderr or stdout}"
+        time.sleep(key_delay)
+
+    return True, f"Navigated to content on {ip} via {len(keys)} remote button presses."
 
 
 def list_installed_packages(ip, port=None):

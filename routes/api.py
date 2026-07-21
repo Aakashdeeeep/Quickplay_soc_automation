@@ -277,7 +277,9 @@ def launch_auto():
             "message": f"No known {content_type} titles for {platform} in the catalog yet — use Advanced entry.",
         }), 404
 
-    success, message = launcher.launch_content(device, match["content_id"], platform)
+    success, message = launcher.launch_content(
+        device, match["content_id"], platform, nav_sequence=match.get("nav_sequence")
+    )
     if success:
         models.touch_last_seen(slot_id)
 
