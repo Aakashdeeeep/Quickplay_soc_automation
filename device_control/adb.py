@@ -144,6 +144,14 @@ def send_key_sequence(ip, package_name, keys, port=None, key_delay=NAV_KEY_DELAY
     Returns (True, message) on success, (False, message) on failure.
     Fragile by nature — this replays a fixed path through the app's menu,
     so it breaks if the app's layout changes.
+
+    Always force-stops the app before relaunching it, even if it's already
+    running — a recorded sequence assumes a fresh Home/start screen, and if
+    the app was left mid-playback from a previous launch, simply bringing
+    it to the foreground resumes that same screen instead of resetting it,
+    so the blind key presses land in the wrong place (confirmed: this is
+    why a sequence that worked once could fail right after another launch
+    left something playing).
     """
     state = ensure_connected(ip, port)
 
@@ -156,6 +164,9 @@ def send_key_sequence(ip, package_name, keys, port=None, key_delay=NAV_KEY_DELAY
         return False, f"Could not reach ADB device at {ip} — device may be off or unreachable."
 
     serial = _serial(ip, port)
+
+    _run(["-s", serial, "shell", "am", "force-stop", package_name])
+    time.sleep(0.5)  # let the stop actually land before relaunching
 
     returncode, stdout, stderr = _run([
         "-s", serial, "shell", "monkey",
