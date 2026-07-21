@@ -40,7 +40,15 @@ def _parse_nav_sequence(nav_sequence):
                             self-corrects if the app's layout has shifted,
                             instead of trusting a fixed press-count that
                             can silently land on the wrong row
-      "KEY?text1|text2:N" — same, with an explicit max press count
+      "KEY?text1|text2:N"    — same, with an explicit max press count
+      "KEY?text1|text2:N:S" — same, but press `key` S times with NO check
+                            first ("skip"), then verify for up to N more.
+                            Each check costs a couple seconds (uiautomator
+                            dump is slow on-device no matter how it's
+                            called) — skipping presses already known to be
+                            needed (e.g. "Free" is reliably ~5 DOWN presses
+                            away) keeps most of the speed of blind
+                            pressing while still verifying the landing.
     """
     steps = []
     for token in nav_sequence.split(","):
@@ -51,13 +59,12 @@ def _parse_nav_sequence(nav_sequence):
         if "?" in token:
             key, rest = token.split("?", 1)
             key = key.strip()
-            if ":" in rest:
-                targets_part, max_part = rest.rsplit(":", 1)
-                max_presses = int(max_part.strip())
-            else:
-                targets_part, max_presses = rest, DEFAULT_SEEK_MAX_PRESSES
+            parts = rest.split(":")
+            targets_part = parts[0]
+            max_presses = int(parts[1].strip()) if len(parts) > 1 else DEFAULT_SEEK_MAX_PRESSES
+            skip = int(parts[2].strip()) if len(parts) > 2 else 0
             targets = [t.strip() for t in targets_part.split("|") if t.strip()]
-            steps.append({"type": "seek", "key": key, "targets": targets, "max": max_presses})
+            steps.append({"type": "seek", "key": key, "targets": targets, "max": max_presses, "skip": skip})
         elif "*" in token:
             key, count_spec = token.split("*", 1)
             key = key.strip()

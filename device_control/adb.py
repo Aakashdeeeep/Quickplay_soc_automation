@@ -200,11 +200,24 @@ def get_focused_element_text(serial):
     return _first_text_in_subtree(target)
 
 
-def _seek_focused(serial, key, targets, max_presses, delay):
+def _seek_focused(serial, key, targets, max_presses, delay, skip=0):
     """Press `key` up to max_presses times, checking the focused element's
     text/content-desc after each press (and once before, in case we're
     already there), stopping as soon as it case-insensitively contains
-    any of `targets`. Returns (found: bool, last_seen_text: str|None)."""
+    any of `targets`. Returns (found: bool, last_seen_text: str|None).
+
+    `skip`: press `key` this many times with NO check first. Each check
+    is a `uiautomator dump`, which costs ~2 seconds on-device regardless
+    of how it's invoked (confirmed: combining the dump+read into one adb
+    call didn't meaningfully change the timing — the dump itself is the
+    slow part, not the round-trip). Skipping the presses we already know
+    are needed (e.g. "Free" is reliably ~5 DOWN presses away) keeps most
+    of the speed of blind pressing while still verifying the landing.
+    """
+    for _ in range(skip):
+        _press_key(serial, key)
+        time.sleep(delay)
+
     last_text = None
     for attempt in range(max_presses + 1):
         current = get_focused_element_text(serial)
@@ -282,7 +295,9 @@ def send_key_sequence(ip, package_name, steps, port=None, key_delay=NAV_KEY_DELA
     seek_notes = []
     for step in steps:
         if step["type"] == "seek":
-            found, last_seen = _seek_focused(serial, step["key"], step["targets"], step["max"], key_delay)
+            found, last_seen = _seek_focused(
+                serial, step["key"], step["targets"], step["max"], key_delay, skip=step.get("skip", 0)
+            )
             if not found:
                 seek_notes.append(
                     f"couldn't confirm reaching {step['targets']!r} within {step['max']} presses "
