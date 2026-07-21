@@ -108,13 +108,14 @@ def resolve_platform_key(platform):
         return "aha"
     return normalized.replace(" ", "_")
 
-# Android package name -> friendly platform name, for mapping real
+# Android package name -> PLATFORMS key, for mapping real
 # `adb shell pm list packages` output to something an operator recognizes.
-# Only "aha" is confirmed right now — anything installed that isn't in
-# this map is simply not offered as a selectable app (better than showing
-# raw package names), and the UI falls back to the content catalog.
+# Anything installed that isn't in this map is simply not offered as a
+# selectable app (better than showing raw package names), and the UI
+# falls back to the content catalog.
 PACKAGE_TO_PLATFORM = {
     "ahaflix.tv": "aha",
+    "com.tm.unifitv.tv": "tm",
 }
 
 # Preset content titles shown in the launch dropdown, per platform.

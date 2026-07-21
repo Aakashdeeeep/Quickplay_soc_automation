@@ -5,6 +5,8 @@ of Roku-vs-ADB-vs-(future)AppleTV details — adding a new device_type means
 adding a branch here and a control module, nothing else changes.
 """
 
+import random
+
 from config import (
     PLATFORMS,
     DEFAULT_MEDIA_TYPE,
@@ -17,6 +19,33 @@ from device_control import roku, adb
 
 class LaunchError(Exception):
     pass
+
+
+def _expand_nav_sequence(nav_sequence):
+    """Parse a nav_sequence string into a concrete list of keyevent names.
+    Most tokens are a plain key name (e.g. "DPAD_DOWN"). A token can also
+    be "KEY*N" (press KEY exactly N times) or "KEY*MIN-MAX" (press KEY a
+    random number of times in that inclusive range each run) — used to
+    land on a different item in a row each launch (e.g. a random highlight
+    clip) instead of always the same one."""
+    keys = []
+    for token in nav_sequence.split(","):
+        token = token.strip()
+        if not token:
+            continue
+        if "*" in token:
+            key, count_spec = token.split("*", 1)
+            key = key.strip()
+            count_spec = count_spec.strip()
+            if "-" in count_spec:
+                lo, hi = count_spec.split("-", 1)
+                count = random.randint(int(lo), int(hi))
+            else:
+                count = int(count_spec)
+            keys.extend([key] * count)
+        else:
+            keys.append(token)
+    return keys
 
 
 def launch_content(device, content_id, platform_label, nav_sequence=None):
@@ -32,7 +61,10 @@ def launch_content(device, content_id, platform_label, nav_sequence=None):
     "DPAD_LEFT,DPAD_DOWN,DPAD_CENTER") simulating remote-control button
     presses to reach specific content — for platforms where playback needs
     a real backend/DRM handshake a URL can't trigger (confirmed on Unifi
-    TV). Takes priority over content_id/deep-linking when present, and
+    TV). A token can be "KEY*N" or "KEY*MIN-MAX" to repeat a key N times or
+    a random count in that range each run (e.g. landing on a different item
+    in a row, like a random highlight clip, instead of always the same
+    one). Takes priority over content_id/deep-linking when present, and
     only applies to ADB-controlled devices.
 
     Returns (success: bool, message: str) — never raises for expected
@@ -77,7 +109,7 @@ def launch_content(device, content_id, platform_label, nav_sequence=None):
         adb_port = device.get("adb_port")  # per-device: Wireless Debugging uses a random port
 
         if nav_sequence:
-            keys = [k.strip() for k in nav_sequence.split(",") if k.strip()]
+            keys = _expand_nav_sequence(nav_sequence)
             return adb.send_key_sequence(ip, package, keys, port=adb_port)
 
         template = platform.get("deep_link_template")

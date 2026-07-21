@@ -7,7 +7,7 @@ from flask import Blueprint, request, jsonify
 import models
 import content_catalog
 import slot_naming
-from config import NETWORKS, DEVICE_TYPES, ADB_DEVICE_TYPES, PACKAGE_TO_PLATFORM
+from config import NETWORKS, DEVICE_TYPES, ADB_DEVICE_TYPES, PACKAGE_TO_PLATFORM, PLATFORMS
 from device_control import status as status_control
 from device_control import launcher
 from device_control import scanner
@@ -231,12 +231,12 @@ def device_apps(slot_id):
         packages = adb_control.list_installed_packages(device["last_known_ip"], device.get("adb_port"))
         if packages:
             matched = sorted({
-                friendly for pkg, friendly in PACKAGE_TO_PLATFORM.items() if pkg in packages
+                key for pkg, key in PACKAGE_TO_PLATFORM.items() if pkg in packages
             })
             if matched:
                 return jsonify({
                     "source": "installed",
-                    "apps": [{"platform": p, "label": p} for p in matched],
+                    "apps": [{"platform": p, "label": PLATFORMS.get(p, {}).get("label", p)} for p in matched],
                 })
 
     if catalog_entry:
