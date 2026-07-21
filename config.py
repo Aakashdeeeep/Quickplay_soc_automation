@@ -47,7 +47,27 @@ PLATFORMS = {
         # devices.roku_app_id (seed_devices.py --roku-app-id) instead.
         "roku_app_id": None,
         "android_package": "ahaflix.tv",
-        "deep_link_template": "https://www.aha.video/movie/{content_id}",
+        # Confirmed on a real device (TV1-CH1): /movie/{id} opens the
+        # content's detail page but does not start playback; /player/{id}
+        # (found via `adb shell dumpsys package ahaflix.tv`'s registered
+        # intent-filter path patterns, not documented anywhere) actually
+        # plays it. This is Android/ADB-only — Roku's launch path uses ECP's
+        # own contentId+mediaType params, not a URL template, so it's
+        # unaffected by this.
+        "deep_link_template": "https://www.aha.video/player/{content_id}",
+    },
+    "tm": {
+        # "Unifi TV" (Telekom Malaysia) — same underlying white-label
+        # platform as aha (com.quickplay.ott.*), confirmed on a real
+        # device (TV1-CH4, a Xiaomi Mi TV Stick). "tm" as the key matches
+        # the OPS_RESTRICTED_PLATFORMS keyword and the original content
+        # catalog draft's platform label for this slot.
+        "label": "Unifi TV (TM)",
+        "roku_app_id": None,  # ADB-only so far; no Roku instance confirmed yet
+        "android_package": "com.tm.unifitv.tv",
+        # Same /player/{id} pattern confirmed to work for aha — not yet
+        # tested with a real Unifi TV content ID.
+        "deep_link_template": "https://tm-web-ui-cdn.api.tmcms.quickplay.com/player/{content_id}",
     },
 }
 
@@ -104,6 +124,9 @@ CONTENT_PRESETS = {
     "aha": [
         {"label": "Constable", "content_id": "constable"},
     ],
+    # No known working deep-link content IDs yet for Unifi TV — leave the
+    # content-ID field blank in Advanced entry to just open the app.
+    "tm": [],
 }
 
 DEFAULT_MEDIA_TYPE = "movie"

@@ -306,13 +306,13 @@ def scan_network_route(network_name):
 def launch():
     data = request.get_json(silent=True) or {}
     slot_id = data.get("slot_id")
-    content_id = data.get("content_id")
+    content_id = _clean(data.get("content_id"))  # blank is valid: "just open the app"
     platform = data.get("platform")
 
-    if not slot_id or not content_id or not platform:
+    if not slot_id or not platform:
         return jsonify({
             "success": False,
-            "message": "slot_id, content_id, and platform are all required.",
+            "message": "slot_id and platform are required.",
         }), 400
 
     device = models.get_device_by_slot(slot_id)

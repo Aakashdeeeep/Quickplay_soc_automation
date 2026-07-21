@@ -23,6 +23,8 @@ def launch_content(device, content_id, platform_label):
     """device: a dict from models.py (must have device_type, last_known_ip,
     network).
     content_id: platform-specific slug/ID, either a preset or operator-pasted.
+    Blank/None is valid — it means "just open the app/channel", for
+    platforms where we don't have a working deep-link format yet.
     platform_label: free-text platform name — either a PLATFORMS config key
     (e.g. "aha") from manual entry, or a raw content_catalog platform string
     (e.g. "aha Telugu") from the assigned-title dropdown.
@@ -66,7 +68,10 @@ def launch_content(device, content_id, platform_label):
         if not package:
             return False, f"No Android package configured for platform '{platform_key}'."
         template = platform.get("deep_link_template")
-        deep_link_url = template.format(content_id=content_id) if template else None
+        # Blank content_id means "just open the app" (e.g. no working
+        # deep-link format known yet for this platform) - only build a
+        # deep link URL when there's an actual ID to put in it.
+        deep_link_url = template.format(content_id=content_id) if template and content_id else None
         # adb_port is per-device — devices paired via Android's on-device
         # Wireless Debugging use a random port, not the fixed 5555 default.
         return adb.launch_content(ip, package, deep_link_url, port=device.get("adb_port"))

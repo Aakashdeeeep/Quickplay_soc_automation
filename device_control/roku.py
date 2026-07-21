@@ -13,7 +13,10 @@ class RokuError(Exception):
 
 
 def launch_content(ip, app_id, content_id, media_type=DEFAULT_MEDIA_TYPE):
-    """Deep-link into a Roku channel at a specific content ID.
+    """Launch a Roku channel, optionally deep-linking to a specific content
+    ID. content_id may be blank/None — ECP's /launch endpoint supports
+    opening a channel to its own home screen with no contentId at all,
+    for cases where we don't have a working deep-link target yet.
 
     Returns (True, message) on success, (False, message) on failure.
     Raises nothing — callers get a clean status tuple for UI feedback.
@@ -22,7 +25,7 @@ def launch_content(ip, app_id, content_id, media_type=DEFAULT_MEDIA_TYPE):
         return False, "No Roku app ID configured for this platform."
 
     url = f"http://{ip}:{ROKU_ECP_PORT}/launch/{app_id}"
-    params = {"contentId": content_id, "mediaType": media_type}
+    params = {"contentId": content_id, "mediaType": media_type} if content_id else {}
 
     try:
         resp = requests.post(url, params=params, timeout=ROKU_REQUEST_TIMEOUT)
@@ -34,7 +37,8 @@ def launch_content(ip, app_id, content_id, media_type=DEFAULT_MEDIA_TYPE):
         return False, f"Roku request failed: {exc}"
 
     if resp.status_code == 200:
-        return True, f"Launched {content_id} on Roku at {ip}."
+        label = content_id if content_id else "channel home"
+        return True, f"Launched {label} on Roku at {ip}."
     return False, f"Roku at {ip} returned HTTP {resp.status_code}."
 
 

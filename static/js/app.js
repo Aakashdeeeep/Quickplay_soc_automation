@@ -115,12 +115,9 @@
     platformSelect.addEventListener("change", populatePresets);
 
     launchBtn.addEventListener("click", async () => {
+        // Blank is valid — it means "just open the app", for platforms
+        // without a working deep-link format yet.
         const contentId = customInput.value.trim() || presetSelect.value;
-        if (!contentId) {
-            launchResult.textContent = "Pick a preset or enter a content ID.";
-            launchResult.className = "launch-result error";
-            return;
-        }
 
         launchBtn.disabled = true;
         launchResult.textContent = "Launching...";

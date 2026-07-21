@@ -163,12 +163,9 @@
     });
 
     advLaunchBtn.addEventListener("click", async () => {
+        // Blank is valid here — it means "just open the app", for
+        // platforms without a working deep-link format yet.
         const contentId = advContentId.value.trim() || advPreset.value;
-        if (!contentId) {
-            advLaunchResult.textContent = "Pick a preset or enter a content ID.";
-            advLaunchResult.className = "launch-result error";
-            return;
-        }
 
         advLaunchBtn.disabled = true;
         advLaunchResult.textContent = "Launching...";
