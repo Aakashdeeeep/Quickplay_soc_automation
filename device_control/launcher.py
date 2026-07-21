@@ -67,7 +67,9 @@ def launch_content(device, content_id, platform_label):
             return False, f"No Android package configured for platform '{platform_key}'."
         template = platform.get("deep_link_template")
         deep_link_url = template.format(content_id=content_id) if template else None
-        return adb.launch_content(ip, package, deep_link_url)
+        # adb_port is per-device — devices paired via Android's on-device
+        # Wireless Debugging use a random port, not the fixed 5555 default.
+        return adb.launch_content(ip, package, deep_link_url, port=device.get("adb_port"))
 
     if device_type == "appletv":
         return False, "AppleTV control is not implemented yet."

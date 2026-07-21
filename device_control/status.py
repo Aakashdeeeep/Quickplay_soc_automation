@@ -20,12 +20,16 @@ def _port_open(ip, port, timeout=STATUS_CHECK_TIMEOUT):
         return False
 
 
-def check_status(device_type, ip):
+def check_status(device_type, ip, adb_port=None):
     """Return a dict: {'online': bool, 'detail': str}.
 
     For ADB devices this also surfaces the authorization state, since
     "port open but unauthorized" is a distinct, actionable condition the
     UI should show rather than lumping in with plain offline.
+
+    adb_port: per-device override for devices paired via Android's
+    on-device Wireless Debugging (random port, not the fixed 5555
+    default) — see device_control/adb.py for why this can't be a constant.
     """
     if not ip:
         return {"online": False, "detail": "No IP on record — needs scan/assign."}
@@ -35,9 +39,9 @@ def check_status(device_type, ip):
         return {"online": online, "detail": "reachable" if online else "unreachable"}
 
     if device_type in ADB_DEVICE_TYPES:
-        if not _port_open(ip, ADB_PORT):
+        if not _port_open(ip, adb_port or ADB_PORT):
             return {"online": False, "detail": "unreachable"}
-        state = adb_control.get_device_state(ip)
+        state = adb_control.get_device_state(ip, adb_port)
         if state == "device":
             return {"online": True, "detail": "authorized"}
         if state == "unauthorized":

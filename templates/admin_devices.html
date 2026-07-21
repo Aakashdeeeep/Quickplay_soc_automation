@@ -24,6 +24,7 @@
             <th>IP</th>
             <th>Platform</th>
             <th>Roku App ID</th>
+            <th>ADB Port</th>
             <th>Friendly name</th>
             <th></th>
         </tr>
@@ -38,6 +39,7 @@
             <td>{{ d.last_known_ip or '—' }}</td>
             <td>{{ d.platform or '—' }}</td>
             <td>{{ d.roku_app_id or '—' }}</td>
+            <td>{{ d.adb_port or '—' }}</td>
             <td>{{ d.friendly_name or '—' }}</td>
             <td class="table-actions">
                 <button class="edit-device-btn"
@@ -48,12 +50,13 @@
                         data-last-known-ip="{{ d.last_known_ip or '' }}"
                         data-platform="{{ d.platform or '' }}"
                         data-roku-app-id="{{ d.roku_app_id or '' }}"
+                        data-adb-port="{{ d.adb_port or '' }}"
                         data-friendly-name="{{ d.friendly_name or '' }}">Edit</button>
                 <button class="delete-device-btn" data-slot-id="{{ d.slot_id }}">Delete</button>
             </td>
         </tr>
         {% else %}
-        <tr><td colspan="9" class="empty-state">No devices registered yet.</td></tr>
+        <tr><td colspan="10" class="empty-state">No devices registered yet.</td></tr>
         {% endfor %}
     </tbody>
 </table>
@@ -93,6 +96,9 @@
 
         <label for="f-roku-app-id">Roku app ID</label>
         <input type="text" id="f-roku-app-id" placeholder="Roku only, per-device (optional)">
+
+        <label for="f-adb-port">ADB port</label>
+        <input type="text" id="f-adb-port" placeholder="Only if paired via on-device Wireless Debugging (optional, default 5555)">
 
         <label for="f-friendly-name">Friendly name</label>
         <input type="text" id="f-friendly-name" placeholder="optional">

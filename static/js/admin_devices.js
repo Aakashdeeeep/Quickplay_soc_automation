@@ -15,6 +15,7 @@
     const fIp = document.getElementById("f-last-known-ip");
     const fPlatform = document.getElementById("f-platform");
     const fRokuAppId = document.getElementById("f-roku-app-id");
+    const fAdbPort = document.getElementById("f-adb-port");
     const fFriendlyName = document.getElementById("f-friendly-name");
 
     let editingSlotId = null;
@@ -27,6 +28,7 @@
         fIp.value = "";
         fPlatform.value = "";
         fRokuAppId.value = "";
+        fAdbPort.value = "";
         fFriendlyName.value = "";
         formResult.textContent = "";
         formResult.className = "launch-result";
@@ -52,6 +54,7 @@
         fIp.value = btn.dataset.lastKnownIp;
         fPlatform.value = btn.dataset.platform;
         fRokuAppId.value = btn.dataset.rokuAppId;
+        fAdbPort.value = btn.dataset.adbPort;
         fFriendlyName.value = btn.dataset.friendlyName;
         modal.classList.remove("hidden");
     }
@@ -95,6 +98,7 @@
             last_known_ip: fIp.value.trim(),
             platform: fPlatform.value.trim(),
             roku_app_id: fRokuAppId.value.trim(),
+            adb_port: fAdbPort.value.trim(),
             friendly_name: fFriendlyName.value.trim(),
         };
 

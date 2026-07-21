@@ -69,13 +69,19 @@ def get_device_by_mac(mac_address):
 
 def upsert_device(slot_id, device_type, last_known_ip, network,
                    friendly_name=None, platform=None, roku_app_id=None,
-                   mac_address=None, touch_last_seen=True):
+                   mac_address=None, adb_port=None, touch_last_seen=True):
     """Create or update a device by slot_id. Used by manual seeding today
     and by the scan/assign flow later.
 
     roku_app_id is per-device: privately-distributed Roku channels (like
     aha) can be assigned a different app ID on each Roku unit, so this
     can't live in the global platform config.
+
+    adb_port is per-device for a similar reason: Android's on-device
+    "Wireless debugging" pairing (no USB needed) puts ADB on a random port
+    shown on-screen, not the fixed 5555 `adb tcpip 5555` uses — and it
+    can't be auto-discovered by scanning, only read off that device's
+    pairing screen.
 
     mac_address is optional here since manual seeding predates having real
     fleet MAC data — once that lands, registration should key off MAC via
@@ -94,20 +100,21 @@ def upsert_device(slot_id, device_type, last_known_ip, network,
                        platform = COALESCE(?, platform),
                        roku_app_id = COALESCE(?, roku_app_id),
                        mac_address = COALESCE(?, mac_address),
+                       adb_port = COALESCE(?, adb_port),
                        last_seen_timestamp = COALESCE(?, last_seen_timestamp)
                    WHERE slot_id = ?""",
                 (device_type, last_known_ip, network, friendly_name, platform,
-                 roku_app_id, mac_address, last_seen, slot_id),
+                 roku_app_id, mac_address, adb_port, last_seen, slot_id),
             )
         else:
             conn.execute(
                 """INSERT INTO devices
                    (slot_id, device_type, last_known_ip, network,
                     friendly_name, platform, roku_app_id, mac_address,
-                    last_seen_timestamp)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                    adb_port, last_seen_timestamp)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                 (slot_id, device_type, last_known_ip, network,
-                 friendly_name, platform, roku_app_id, mac_address, last_seen),
+                 friendly_name, platform, roku_app_id, mac_address, adb_port, last_seen),
             )
         conn.commit()
         return get_device_by_slot(slot_id)
@@ -116,7 +123,8 @@ def upsert_device(slot_id, device_type, last_known_ip, network,
 
 
 def replace_device_fields(slot_id, device_type, last_known_ip, network,
-                           friendly_name, platform, roku_app_id, mac_address):
+                           friendly_name, platform, roku_app_id, mac_address,
+                           adb_port=None):
     """Direct-assignment update for the admin edit UI: every field is set
     exactly to the given value, including None to actually clear it —
     unlike upsert_device's COALESCE-based partial-merge (which exists so
@@ -129,10 +137,10 @@ def replace_device_fields(slot_id, device_type, last_known_ip, network,
             """UPDATE devices
                SET device_type = ?, last_known_ip = ?, network = ?,
                    friendly_name = ?, platform = ?, roku_app_id = ?,
-                   mac_address = ?
+                   mac_address = ?, adb_port = ?
                WHERE slot_id = ?""",
             (device_type, last_known_ip, network, friendly_name, platform,
-             roku_app_id, mac_address, slot_id),
+             roku_app_id, mac_address, adb_port, slot_id),
         )
         conn.commit()
         return get_device_by_slot(slot_id)

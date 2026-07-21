@@ -18,7 +18,8 @@ CREATE TABLE IF NOT EXISTS devices (
     last_seen_timestamp TEXT,
     friendly_name TEXT,
     platform TEXT,
-    roku_app_id TEXT
+    roku_app_id TEXT,
+    adb_port INTEGER
 );
 
 CREATE TABLE IF NOT EXISTS content_catalog (
@@ -54,6 +55,15 @@ def _migrate(conn):
         conn.execute("ALTER TABLE devices ADD COLUMN roku_app_id TEXT")
     if "mac_address" not in existing_columns:
         conn.execute("ALTER TABLE devices ADD COLUMN mac_address TEXT")
+    if "adb_port" not in existing_columns:
+        # Android's on-device "Wireless debugging" pairing (no USB/computer
+        # needed) puts ADB on a random port shown on-screen, not the fixed
+        # 5555 that `adb tcpip 5555` (USB-based) uses. Confirmed on a real
+        # Chromecast (TV1-CH1) — its ADB port was neither 5555 nor
+        # discoverable by scanning, only visible via the on-device pairing
+        # screen. Per-device like roku_app_id, for the same reason: no safe
+        # global default, and it can't be auto-discovered by the scanner.
+        conn.execute("ALTER TABLE devices ADD COLUMN adb_port INTEGER")
 
     # Permanent hardware identity — unique when set, but many rows will
     # have no MAC yet (pending real fleet data), so this must tolerate

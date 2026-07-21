@@ -10,14 +10,18 @@ and known app/content IDs.
 import re
 
 # Networks operators can pick from in the UI.
-# subnet_prefix is used by the (future) scan feature — fill in SOC/US1/US2
-# once confirmed. US1/US2 are two bands (2.4GHz/5GHz) off the same router,
-# so they may end up sharing a prefix or needing VLAN-specific handling.
+# subnet_prefixes drives the scan feature — a list, not a single prefix,
+# because a "network" here isn't reliably one clean /24: OPS turned out to
+# span both 192.168.208.x and 192.168.209.x (confirmed by a device that
+# only showed up once .209 was added — likely one DHCP pool spanning a
+# /23, or two scopes on the same broadcast domain, not confirmed which).
+# Fill in SOC/US1/US2 once confirmed. US1/US2 are two bands (2.4GHz/5GHz)
+# off the same router, so they may end up sharing prefixes.
 NETWORKS = {
-    "OPS": {"label": "OPS", "subnet_prefix": "192.168.208."},
-    "SOC": {"label": "SOC", "subnet_prefix": None},
-    "US1": {"label": "US1 (2.4GHz)", "subnet_prefix": None},
-    "US2": {"label": "US2 (5GHz)", "subnet_prefix": None},
+    "OPS": {"label": "OPS", "subnet_prefixes": ["192.168.208.", "192.168.209."]},
+    "SOC": {"label": "SOC", "subnet_prefixes": None},
+    "US1": {"label": "US1 (2.4GHz)", "subnet_prefixes": None},
+    "US2": {"label": "US2 (5GHz)", "subnet_prefixes": None},
 }
 
 DEVICE_TYPES = ["roku", "firetv", "androidtv", "chromecast-gtv", "mi-stick", "appletv"]

@@ -24,6 +24,16 @@ def _clean(value):
     return value or None
 
 
+def _clean_int(value):
+    cleaned = _clean(value) if isinstance(value, str) else value
+    if cleaned is None or cleaned == "":
+        return None
+    try:
+        return int(cleaned)
+    except (TypeError, ValueError):
+        return None
+
+
 @api_bp.route("/devices", methods=["GET"])
 def list_devices_route():
     """Full registry listing — powers the admin device management table."""
@@ -66,6 +76,7 @@ def _create_one_device(data, seen_macs):
         platform=_clean(data.get("platform")),
         roku_app_id=_clean(data.get("roku_app_id")),
         mac_address=mac_address,
+        adb_port=_clean_int(data.get("adb_port")),
         touch_last_seen=False,
     )
     return True, f"Created {slot_id}.", device
@@ -129,6 +140,9 @@ def update_device_route(slot_id):
     def field(name):
         return _clean(data[name]) if name in data else existing[name]
 
+    def int_field(name):
+        return _clean_int(data[name]) if name in data else existing[name]
+
     device_type = field("device_type") or existing["device_type"]
     if device_type not in DEVICE_TYPES:
         return jsonify({"success": False, "message": f"device_type must be one of: {', '.join(DEVICE_TYPES)}"}), 400
@@ -152,6 +166,7 @@ def update_device_route(slot_id):
         platform=field("platform"),
         roku_app_id=field("roku_app_id"),
         mac_address=mac_address,
+        adb_port=int_field("adb_port"),
     )
     return jsonify({"success": True, "device": device})
 
@@ -172,7 +187,7 @@ def network_status(network_name):
     result = {}
     for device in devices:
         result[device["slot_id"]] = status_control.check_status(
-            device["device_type"], device["last_known_ip"]
+            device["device_type"], device["last_known_ip"], device.get("adb_port")
         )
     return jsonify(result)
 
@@ -182,7 +197,7 @@ def device_status(slot_id):
     device = models.get_device_by_slot(slot_id)
     if not device:
         return jsonify({"error": f"No device with slot_id '{slot_id}'"}), 404
-    result = status_control.check_status(device["device_type"], device["last_known_ip"])
+    result = status_control.check_status(device["device_type"], device["last_known_ip"], device.get("adb_port"))
     return jsonify(result)
 
 
@@ -195,7 +210,7 @@ def tv_status(tv_id):
     result = {}
     for device in devices:
         result[device["slot_id"]] = status_control.check_status(
-            device["device_type"], device["last_known_ip"]
+            device["device_type"], device["last_known_ip"], device.get("adb_port")
         )
     return jsonify(result)
 
@@ -213,7 +228,7 @@ def device_apps(slot_id):
     catalog_entry = content_catalog.get_by_slot(slot_id)
 
     if device["device_type"] in ADB_DEVICE_TYPES and device["last_known_ip"]:
-        packages = adb_control.list_installed_packages(device["last_known_ip"])
+        packages = adb_control.list_installed_packages(device["last_known_ip"], device.get("adb_port"))
         if packages:
             matched = sorted({
                 friendly for pkg, friendly in PACKAGE_TO_PLATFORM.items() if pkg in packages
@@ -279,11 +294,11 @@ def scan_network_route(network_name):
     if network_name not in NETWORKS:
         return jsonify({"error": f"Unknown network '{network_name}'"}), 404
 
-    subnet_prefix = NETWORKS[network_name].get("subnet_prefix")
-    if not subnet_prefix:
+    subnet_prefixes = NETWORKS[network_name].get("subnet_prefixes")
+    if not subnet_prefixes:
         return jsonify({"error": f"No subnet configured for {network_name} yet."}), 400
 
-    result = scanner.scan_network(network_name, subnet_prefix)
+    result = scanner.scan_network(network_name, subnet_prefixes)
     return jsonify(result)
 
 
