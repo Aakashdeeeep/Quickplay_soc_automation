@@ -89,6 +89,64 @@ def ensure_connected(ip, port=None):
     return get_device_state(ip, port)
 
 
+def _wait_for_foreground(serial, package_name, timeout=6, interval=0.5):
+    """Poll until `package_name` actually owns window focus. Necessary
+    because a fixed sleep before navigating is unreliable — confirmed on a
+    real device (CH3) that the app took longer to get window focus at all
+    than a flat 1.5s wait, so the first nav presses landed on whatever was
+    still in the foreground (the Fire TV launcher) instead of the app.
+    Returns True once confirmed, False if it never happened within
+    `timeout` (caller proceeds anyway, best-effort). NOTE: window focus
+    alone is not sufficient to know the app is actually navigable — see
+    _wait_for_ui_text below, which checks for real content."""
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        _, stdout, _ = _run(["-s", serial, "shell", "dumpsys", "window", "windows"], timeout=5)
+        for line in stdout.splitlines():
+            if "mCurrentFocus" in line and package_name in line:
+                return True
+        time.sleep(interval)
+    return False
+
+
+def _wait_for_ui_text(serial, target_text, timeout=12, interval=1.0):
+    """Poll uiautomator dumps until `target_text` appears anywhere on
+    screen. Confirmed necessary on a real device (CH3, Gotham Sports/
+    com.yesnetwork.yes): the app's activity gets window focus (see
+    _wait_for_foreground) within ~1-2s, but its splash animation ("the
+    home of...") keeps the real home screen from being navigable for
+    several more seconds — window focus alone caused nav presses to be
+    silently swallowed or misdirected. This checks for actual rendered
+    content instead of guessing how long a splash takes. Returns True
+    once seen, False if it never appeared within `timeout` (caller
+    proceeds anyway, best-effort)."""
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        _run(["-s", serial, "shell", "uiautomator", "dump", UI_DUMP_PATH], timeout=5)
+        _, stdout, _ = _run(["-s", serial, "shell", "cat", UI_DUMP_PATH], timeout=5)
+        if target_text in stdout:
+            return True
+        time.sleep(interval)
+    return False
+
+
+def _monkey_launch(serial, package_name):
+    """Bring an app to the foreground via `monkey`. Tries the standard
+    LAUNCHER category first, then falls back to LEANBACK_LAUNCHER —
+    confirmed some Android TV apps (e.g. Univision Now/com.univision.prendetv)
+    only declare a LEANBACK_LAUNCHER-category main activity, not LAUNCHER,
+    so the plain monkey call fails with no matching activity found."""
+    for category in ("android.intent.category.LAUNCHER", "android.intent.category.LEANBACK_LAUNCHER"):
+        returncode, stdout, stderr = _run([
+            "-s", serial, "shell", "monkey",
+            "-p", package_name,
+            "-c", category, "1",
+        ])
+        if returncode == 0:
+            return returncode, stdout, stderr
+    return returncode, stdout, stderr
+
+
 def launch_content(ip, package_name, deep_link_url=None, port=None):
     """Launch an app, optionally deep-linking to a specific content URL.
 
@@ -114,14 +172,9 @@ def launch_content(ip, package_name, deep_link_url=None, port=None):
             "-d", deep_link_url,
             package_name,
         ]
+        returncode, stdout, stderr = _run(args)
     else:
-        args = [
-            "-s", serial, "shell", "monkey",
-            "-p", package_name,
-            "-c", "android.intent.category.LAUNCHER", "1",
-        ]
-
-    returncode, stdout, stderr = _run(args)
+        returncode, stdout, stderr = _monkey_launch(serial, package_name)
 
     if returncode is None:
         return False, f"adb command to {ip} timed out."
@@ -280,20 +333,24 @@ def send_key_sequence(ip, package_name, steps, port=None, key_delay=NAV_KEY_DELA
     _run(["-s", serial, "shell", "am", "force-stop", package_name])
     time.sleep(0.5)  # let the stop actually land before relaunching
 
-    returncode, stdout, stderr = _run([
-        "-s", serial, "shell", "monkey",
-        "-p", package_name,
-        "-c", "android.intent.category.LAUNCHER", "1",
-    ])
+    returncode, stdout, stderr = _monkey_launch(serial, package_name)
     if returncode is None:
         return False, f"adb command to {ip} timed out."
     if returncode != 0:
         return False, f"Failed to launch {package_name} on {ip}: {stderr or stdout}"
 
-    time.sleep(1.5)  # let the app come to the foreground before navigating
+    _wait_for_foreground(serial, package_name)
 
     seek_notes = []
     for step in steps:
+        if step["type"] == "wait_text":
+            if not _wait_for_ui_text(serial, step["text"], timeout=step["timeout"]):
+                seek_notes.append(
+                    f"never saw {step['text']!r} on screen within {step['timeout']}s "
+                    "(app may still have been on its splash screen) — continued anyway"
+                )
+            continue
+
         if step["type"] == "seek":
             found, last_seen = _seek_focused(
                 serial, step["key"], step["targets"], step["max"], key_delay, skip=step.get("skip", 0)

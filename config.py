@@ -15,13 +15,14 @@ import re
 # span both 192.168.208.x and 192.168.209.x (confirmed by a device that
 # only showed up once .209 was added — likely one DHCP pool spanning a
 # /23, or two scopes on the same broadcast domain, not confirmed which).
-# Fill in SOC/US1/US2 once confirmed. US1/US2 are two bands (2.4GHz/5GHz)
-# off the same router, so they may end up sharing prefixes.
+# Fill in SOC/Soc_usa/soc_tp_usan once confirmed. Soc_usa/soc_tp_usan are
+# two bands (2.4GHz/5GHz) off the same router, so they may end up sharing
+# prefixes.
 NETWORKS = {
     "OPS": {"label": "OPS", "subnet_prefixes": ["192.168.208.", "192.168.209."]},
     "SOC": {"label": "SOC", "subnet_prefixes": None},
-    "US1": {"label": "US1 (2.4GHz)", "subnet_prefixes": None},
-    "US2": {"label": "US2 (5GHz)", "subnet_prefixes": None},
+    "Soc_usa": {"label": "Soc_usa (2.4GHz)", "subnet_prefixes": ["192.168.50."]},
+    "soc_tp_usan": {"label": "soc_tp_usan (5GHz)", "subnet_prefixes": None},
 }
 
 DEVICE_TYPES = ["roku", "firetv", "androidtv", "chromecast-gtv", "mi-stick", "appletv"]
@@ -68,6 +69,45 @@ PLATFORMS = {
         # Same /player/{id} pattern confirmed to work for aha — not yet
         # tested with a real Unifi TV content ID.
         "deep_link_template": "https://tm-web-ui-cdn.api.tmcms.quickplay.com/player/{content_id}",
+    },
+    # The following 5 confirmed on real Soc_usa devices (CH5/CH8/CH10/CH13/
+    # CH16) via `adb shell pm list packages` and Roku `/query/apps`. No
+    # deep-link templates known yet — launching just opens the app.
+    "univision": {
+        # Company-internal UI label differs from the Roku channel name
+        # ("Univision App: Stream TV Shows") — distinct from "univision_now"
+        # below, which is a different app entirely, not a typo/duplicate.
+        "label": "Univision TVE",
+        "roku_app_id": "573804",
+        "android_package": "com.univision.android",
+        "deep_link_template": None,
+    },
+    "univision_now": {
+        "label": "Univision DTC",
+        "roku_app_id": "122460",
+        "android_package": "com.univision.prendetv",
+        "deep_link_template": None,
+    },
+    "canela": {
+        "label": "Canela",
+        "roku_app_id": "584171",
+        "android_package": "com.canela.ott.tv",
+        "deep_link_template": None,
+    },
+    "the_weather_channel": {
+        "label": "The Weather Channel",
+        "roku_app_id": "273862",
+        "android_package": "com.weathergroup.twc",
+        "deep_link_template": None,
+    },
+    "gotham_sports": {
+        "label": "Gotham Sports",
+        "roku_app_id": "765408",
+        # Confirmed on CH3 — Gotham Sports Network is distributed under
+        # the com.yesnetwork.yes package (YES Network/GSN rebrand), not a
+        # separately-named app.
+        "android_package": "com.yesnetwork.yes",
+        "deep_link_template": None,
     },
 }
 
@@ -116,6 +156,11 @@ def resolve_platform_key(platform):
 PACKAGE_TO_PLATFORM = {
     "ahaflix.tv": "aha",
     "com.tm.unifitv.tv": "tm",
+    "com.univision.android": "univision",
+    "com.univision.prendetv": "univision_now",
+    "com.canela.ott.tv": "canela",
+    "com.weathergroup.twc": "the_weather_channel",
+    "com.yesnetwork.yes": "gotham_sports",
 }
 
 # Preset content titles shown in the launch dropdown, per platform.

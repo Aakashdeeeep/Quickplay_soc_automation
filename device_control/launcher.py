@@ -22,6 +22,7 @@ class LaunchError(Exception):
 
 
 DEFAULT_SEEK_MAX_PRESSES = 10
+DEFAULT_WAIT_TEXT_TIMEOUT = 12
 
 
 def _parse_nav_sequence(nav_sequence):
@@ -49,6 +50,19 @@ def _parse_nav_sequence(nav_sequence):
                             needed (e.g. "Free" is reliably ~5 DOWN presses
                             away) keeps most of the speed of blind
                             pressing while still verifying the landing.
+      "WAIT:text"            — block (up to DEFAULT_WAIT_TEXT_TIMEOUT
+                            seconds) until `text` appears anywhere on
+                            screen before continuing to the next step.
+                            For apps whose splash/loading screen keeps the
+                            UI non-navigable well after the app's activity
+                            already has window focus (confirmed on CH3,
+                            Gotham Sports: window focus lands in ~1-2s but
+                            the splash animation blocks real navigation
+                            for several seconds longer) — put this first
+                            so blind presses don't land on whatever was
+                            still in the foreground before the app
+                            finished loading.
+      "WAIT:text:N"          — same, with an explicit timeout of N seconds
     """
     steps = []
     for token in nav_sequence.split(","):
@@ -56,7 +70,13 @@ def _parse_nav_sequence(nav_sequence):
         if not token:
             continue
 
-        if "?" in token:
+        if token.startswith("WAIT:"):
+            rest = token[len("WAIT:"):]
+            parts = rest.split(":")
+            text = parts[0]
+            timeout = int(parts[1].strip()) if len(parts) > 1 else DEFAULT_WAIT_TEXT_TIMEOUT
+            steps.append({"type": "wait_text", "text": text, "timeout": timeout})
+        elif "?" in token:
             key, rest = token.split("?", 1)
             key = key.strip()
             parts = rest.split(":")

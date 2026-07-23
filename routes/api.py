@@ -7,7 +7,14 @@ from flask import Blueprint, request, jsonify
 import models
 import content_catalog
 import slot_naming
-from config import NETWORKS, DEVICE_TYPES, ADB_DEVICE_TYPES, PACKAGE_TO_PLATFORM, PLATFORMS
+from config import (
+    NETWORKS,
+    DEVICE_TYPES,
+    ADB_DEVICE_TYPES,
+    PACKAGE_TO_PLATFORM,
+    PLATFORMS,
+    resolve_platform_key,
+)
 from device_control import status as status_control
 from device_control import launcher
 from device_control import scanner
@@ -218,12 +225,22 @@ def tv_status(tv_id):
 @api_bp.route("/devices/<slot_id>/apps")
 def device_apps(slot_id):
     """Apps available to launch on this device for the dashboard's app
-    selector: real installed apps we can identify, if the device is an
-    authorized ADB unit; otherwise fall back to whatever the content
-    catalog says is assigned to this slot."""
+    selector: if this slot has one specific app assigned (devices.platform),
+    that's the only one offered — a channel built to always run one app
+    (e.g. CH11 = aha) shouldn't show every other side-loaded/test app that
+    happens to also be installed. Only slots with no assignment fall back
+    to real installed-app detection, then the content catalog."""
     device = models.get_device_by_slot(slot_id)
     if not device:
         return jsonify({"error": f"No device with slot_id '{slot_id}'"}), 404
+
+    if device["platform"]:
+        key = resolve_platform_key(device["platform"])
+        label = PLATFORMS.get(key, {}).get("label", device["platform"])
+        return jsonify({
+            "source": "assigned",
+            "apps": [{"platform": key, "label": label}],
+        })
 
     catalog_entry = content_catalog.get_by_slot(slot_id)
 
